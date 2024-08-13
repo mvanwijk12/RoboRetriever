@@ -5,7 +5,7 @@ __author__ = "Matt van Wijk"
 __date__ = "13/08/2024"
 
 import pigpio
-import numpy as np
+import math
 import os
 import sys
 from time import sleep
@@ -28,7 +28,7 @@ class Drive:
         self.stepR = stepR
         self.dirL = dirL
         self.dirR = dirR
-        self.wheel_circumference = 55e-3 * np.pi # measured wheel diameter 55mm
+        self.wheel_circumference = 55e-3 * math.pi # measured wheel diameter 55mm
         self.traction_factor = 1
         self.steps_per_rev = 200
         self.stepping_mode = 1/8 # Assume 1/8 stepping
@@ -36,35 +36,42 @@ class Drive:
 
         os.system("sudo pigpiod") # start the pigpiod daemon
         GPIO.setmode(GPIO.BCM)
-        GPIO.setup(dir_pin_L, GPIO.OUT, initial=GPIO.HIGH)
-        GPIO.setup(dir_pin_R, GPIO.OUT, initial=GPIO.LOW)
+        GPIO.setup(self.dirL, GPIO.OUT)
+        GPIO.setup(self.dirR, GPIO.OUT)
 
     def set_1D_direction(self, dirForward=True):
         """ Set the drive direction as either forwards or backwards """
         if dirForward:
-            GPIO.output(dir_pin_L, GPIO.HIGH)
-            GPIO.output(dir_pin_R, GPIO.LOW)
+            GPIO.output(self.dirL, GPIO.HIGH)
+            GPIO.output(self.dirR, GPIO.LOW)
         else:
-            GPIO.output(dir_pin_L, GPIO.HIGH)
-            GPIO.output(dir_pin_R, GPIO.LOW)
+            GPIO.output(self.dirL, GPIO.LOW)
+            GPIO.output(self.dirR, GPIO.HIGH)
 
     def drive(self, distance=1, speed=1):
         """ Function to start driving a specified distance in metres """
         req_revolutions = distance/(self.traction_factor * self.wheel_circumference)
+        print(f'#revolutions {req_revolutions}')
         req_steps = req_revolutions * self.steps_per_rev * (1/self.stepping_mode)
+        print(f'required steps {req_steps}')
         
         req_revs_per_sec = speed/(self.traction_factor * self.wheel_circumference)
+        print(f'req_revs_per_sec {req_revs_per_sec}')
         req_steps_per_sec = req_revs_per_sec * self.steps_per_rev * (1/self.stepping_mode) # PWM freq
+        print(f'pwm freq = {int(req_steps_per_sec)}')
         
-        drive_time = req_steps/(req_revs_per_sec)
+        drive_time = req_steps/(req_steps_per_sec)
+        print(f'Required steps {req_steps}')
+        print(f'Required revs per second {req_revs_per_sec}')
+        print(f'Drive time {drive_time}s')
 
         self.setup_timer("Timer 1", drive_time, self.timer_function) 
-        self.pi.hardware_PWM(self.stepL, req_steps_per_sec, 500000)
-        self.pi.hardware_PWM(self.stepR, req_steps_per_sec, 500000)
+        self.pi.hardware_PWM(self.stepL, int(req_steps_per_sec), 500000)
+        self.pi.hardware_PWM(self.stepR, int(req_steps_per_sec), 500000)
 
 
     def setup_timer(self, name, duration_seconds, function):
-    """Sets up a timer to execute a function after a certain duration."""
+        """Sets up a timer to execute a function after a certain duration."""
         def timer_thread():
             print(f"{name} timer started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             sleep(duration_seconds)
@@ -74,10 +81,24 @@ class Drive:
         thread.start()
 
     def timer_function(self, name):
-    """Function to be executed when the timer expires."""
-        pi.hardware_PWM(step_pin_R, 0, 500000)
-        pi.hardware_PWM(step_pin_L, 0, 500000)
+        """Function to be executed when the timer expires."""
+        self.pi.hardware_PWM(self.stepL, 0, 500000)
+        self.pi.hardware_PWM(self.stepR, 0, 500000)
         print(f"{name} timer expired at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
    
+if __name__ == "__main__":
+    
+    try:
+        robot = Drive()
+        robot.set_1D_direction(dirForward=False)
+        robot.drive(speed=0.2)
+        # while True:
+        #     pass
 
+    except KeyboardInterrupt:
+        # terminate gracefully
+        robot.pi.hardware_PWM(robot.stepL, 0, 500000)
+        robot.pi.hardware_PWM(robot.stepR, 0, 500000)
+        GPIO.cleanup()
+        sys.exit()

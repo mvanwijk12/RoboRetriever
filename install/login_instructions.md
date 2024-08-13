@@ -7,3 +7,6 @@ To configure the Raspberry Pi as an accesspoint for ssh access
    `chmod +x AP_setup.sh` \
    `sudo ./AP_setup.sh`
 4. This will create a WiFi accesspoint with SSID `robo-retriever` and password `e21_ece4191` (configured in AP_setup.sh). Connecting to this network will allow ssh access. 
+5. Ssh into the pi using
+   `ssh e21@robo-retriever.local`
+   The password is e21

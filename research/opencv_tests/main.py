@@ -111,8 +111,8 @@ def detect_line(frame):
     connected_lines = connect_lines(lines)
     
     if connected_lines is not None:
-        print("   x1  y1  x2  y2")
-        for line in lines:
+        #print("   x1  y1  x2  y2")
+        for line in connected_lines:
             x1, y1, x2, y2 = line[0]
             print(line)
             cv2.line(line_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
@@ -120,9 +120,9 @@ def detect_line(frame):
     combined_image = cv2.addWeighted(frame, 0.8, line_image, 1, 0)
 
     # display image
-    cv2.imshow('Adaptive Threshold', adaptive_thresh)
-    cv2.imshow('Eroded', eroded)
-    cv2.imshow('Canny', edges)
+    #cv2.imshow('Adaptive Threshold', adaptive_thresh)
+    #cv2.imshow('Eroded', eroded)
+    #cv2.imshow('Canny', edges)
     cv2.imshow('Detected Lines', combined_image)
 
 def detect_cline(frame):
@@ -173,9 +173,9 @@ def detect_cline(frame):
     combined_image = cv2.addWeighted(frame, 0.8, line_image, 1, 0)
     
     # display image
-    cv2.imshow('Adaptive Threshold', adaptive_thresh)
-    cv2.imshow('Eroded', eroded)
-    cv2.imshow('Canny', edges)
+    #cv2.imshow('Adaptive Threshold', adaptive_thresh)
+    #cv2.imshow('Eroded', eroded)
+    #cv2.imshow('Canny', edges)
     cv2.imshow('Detected Lines', combined_image)
 
 if __name__ == "__main__":
@@ -191,11 +191,12 @@ if __name__ == "__main__":
         if not ret:
             break
 
-        detect_balls(frame)
+        #detect_balls(frame)
+        #detect_line(frame)
+        detect_cline(frame)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
     cap.release()
     cv2.destroyAllWindows()
-        

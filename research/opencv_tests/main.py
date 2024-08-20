@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
 import pygame
-import time
 from scipy.interpolate import griddata
 
 # Variables
@@ -230,10 +229,10 @@ if __name__ == "__main__":
 
     slider_values_changed = False
 
-    camera_button = Button(100, 500, 100, 40, "Camera")
-    image_button = Button(220, 500, 100, 40, "Image")
-    left_arrow = ArrowButton(100, 550, "left")
-    right_arrow = ArrowButton(350, 550, "right")
+    camera_button = Button(50, 500, 100, 40, "Camera")
+    image_button = Button(170, 500, 100, 40, "Image")
+    left_arrow = ArrowButton(50, 550, "left")
+    right_arrow = ArrowButton(300, 550, "right")
 
     cap = cv2.VideoCapture(1)
     running = True
@@ -308,7 +307,7 @@ if __name__ == "__main__":
 
             frame_orig = cv2.imread(folder+image_file_names[current_image_index])
             frame = cv2.resize(frame_orig, (504, 378), interpolation=cv2.INTER_AREA)
-            draw_text(screen, image_file_names[current_image_index], (150, 560), size=25)
+            draw_text(screen, image_file_names[current_image_index], (100, 560), size=25)
 
             if slider_values_changed:
                 detect_line(frame)

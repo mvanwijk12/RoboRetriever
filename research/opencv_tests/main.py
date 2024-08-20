@@ -7,11 +7,11 @@ from scipy.interpolate import griddata
 CANNY_T_LOW = 50
 CANNY_T_HIGH = 150
 CANNY_APERTURE = 5
-HOUGH_THRESHOLD = 70
-HOUGH_LINE_LENGTH_MIN = 60
-HOUGH_LINE_GAP_MAX = 20
-CONNECT_DIST_MIN = 30
-CONNECT_ANGLE_MAX = 10
+HOUGH_THRESHOLD = 100
+HOUGH_LINE_LENGTH_MIN = 165
+HOUGH_LINE_GAP_MAX = 65
+CONNECT_DIST_MIN = 75
+CONNECT_ANGLE_MAX = 5
 
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
@@ -263,8 +263,9 @@ if __name__ == "__main__":
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN or event.type == pygame.MOUSEMOTION:
                 if pygame.mouse.get_pressed()[0]:  # Check if the left mouse button is held down
-                    for slider in sliders.values():
+                    for name, slider in sliders.items():
                         slider.update(event.pos)
+                        globals()[name] = slider.value
 
         # Draw headings and sliders
         draw_text(screen, "Canny Edge Detection", (50, 20), color=RED, size=36)
@@ -293,7 +294,7 @@ if __name__ == "__main__":
         pygame.display.flip()
 
         #detect_balls(frame)
-        #detect_line(frame)
+        detect_line(frame)
         #detect_cline(frame)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):

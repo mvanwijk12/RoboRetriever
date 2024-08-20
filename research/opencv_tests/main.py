@@ -6,16 +6,22 @@ from scipy.interpolate import griddata
 # Variables
 CANNY_T_LOW = 50
 CANNY_T_HIGH = 150
-CANNY_APERTURE = 5
+CANNY_APERTURE = 3
 HOUGH_THRESHOLD = 100
 HOUGH_LINE_LENGTH_MIN = 165
 HOUGH_LINE_GAP_MAX = 65
 CONNECT_DIST_MIN = 75
 CONNECT_ANGLE_MAX = 5
 
+image_mode_selected = False
+image_file_names = ["image1.jpg", "image2.jpg", "image3.jpg"]
+current_image_index = 0
+
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
+LIGHT_GREY = (200, 200, 200)
+BLUE = (0, 0, 255)
 
 class Slider:
     def __init__(self, x, y, w, min_val, max_val, start_val, step=1):
@@ -25,6 +31,9 @@ class Slider:
         self.value = start_val
         self.step = step
         self.circle_pos = self.get_circle_pos()
+        self.input_active = False
+        self.input_box = pygame.Rect(self.rect.right + 10, self.rect.y, 50, 20)
+        self.input_text = str(int(self.value))
 
     def get_circle_pos(self):
         ratio = (self.value - self.min_val) / (self.max_val - self.min_val)
@@ -33,9 +42,14 @@ class Slider:
     def draw(self, screen):
         pygame.draw.rect(screen, BLACK, self.rect, 2)
         pygame.draw.circle(screen, BLACK, self.circle_pos, 10)
+        
+        # Draw input box
+        pygame.draw.rect(screen, LIGHT_GREY if self.input_active else WHITE, self.input_box)
+        pygame.draw.rect(screen, BLACK, self.input_box, 2)
+        
         font = pygame.font.Font(None, 24)
-        value_text = font.render(f'{int(self.value)}', True, BLACK)
-        screen.blit(value_text, (self.rect.right + 10, self.rect.y))
+        text_surface = font.render(self.input_text, True, BLACK)
+        screen.blit(text_surface, (self.input_box.x + 5, self.input_box.y))
 
     def update(self, pos):
         if self.rect.collidepoint(pos):
@@ -43,7 +57,64 @@ class Slider:
             self.value = self.min_val + round(ratio * (self.max_val - self.min_val) / self.step) * self.step
             self.value = max(min(self.value, self.max_val), self.min_val)
             self.circle_pos = self.get_circle_pos()
+            self.input_text = str(int(self.value))
 
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if self.input_box.collidepoint(event.pos):
+                self.input_active = True
+            else:
+                self.input_active = False
+
+        if event.type == pygame.KEYDOWN and self.input_active:
+            if event.key == pygame.K_RETURN:
+                # When Enter is pressed, update the slider value
+                try:
+                    entered_value = int(self.input_text)
+                    self.value = max(min(entered_value, self.max_val), self.min_val)
+                    self.circle_pos = self.get_circle_pos()
+                except ValueError:
+                    pass
+                self.input_active = False
+            elif event.key == pygame.K_BACKSPACE:
+                self.input_text = self.input_text[:-1]
+            else:
+                if event.unicode.isdigit() or (event.unicode == '-' and len(self.input_text) == 0):
+                    self.input_text += event.unicode
+
+class Button:
+    def __init__(self, x, y, w, h, text):
+        self.rect = pygame.Rect(x, y, w, h)
+        self.text = text
+        self.active = False
+
+    def draw(self, screen):
+        color = BLUE if self.active else BLACK
+        pygame.draw.rect(screen, color, self.rect, 2)
+        font = pygame.font.Font(None, 30)
+        text_surface = font.render(self.text, True, color)
+        text_rect = text_surface.get_rect(center=self.rect.center)
+        screen.blit(text_surface, text_rect)
+
+    def is_clicked(self, pos):
+        return self.rect.collidepoint(pos)
+
+class ArrowButton:
+    def __init__(self, x, y, direction):
+        self.rect = pygame.Rect(x, y, 40, 40)
+        self.direction = direction
+
+    def draw(self, screen):
+        pygame.draw.rect(screen, BLACK, self.rect, 2)
+        font = pygame.font.Font(None, 36)
+        arrow_text = "<" if self.direction == "left" else ">"
+        text_surface = font.render(arrow_text, True, BLACK)
+        text_rect = text_surface.get_rect(center=self.rect.center)
+        screen.blit(text_surface, text_rect)
+
+    def is_clicked(self, pos):
+        return self.rect.collidepoint(pos)
+    
 def draw_text(screen, text, pos, color=BLACK, size=30):
     font = pygame.font.Font(None, size)
     text_surface = font.render(text, True, color)
@@ -172,59 +243,6 @@ def detect_line(frame):
     #cv2.imshow('Canny', edges)
     cv2.imshow('Detected Lines', combined_image)
 
-def detect_cline(frame):
-    # convert to greyscale
-    grey_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-    # apply gaussian blur
-    blurred = cv2.GaussianBlur(grey_image, (5, 5), 0)
-
-    # adaptive thresholding for different shades of white of lines
-    adaptive_thresh = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-    
-    # morphological operations to close gaps in lines
-    kernel = np.ones((3, 3), np.uint8)
-    dilated = cv2.dilate(adaptive_thresh, kernel, iterations=1)
-    eroded = cv2.erode(dilated, kernel, iterations=1)
-
-    # edge detection
-    edges = cv2.Canny(eroded, 50, 150)
-
-    # Hough line transform
-    lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=80, minLineLength=30, maxLineGap=20)
-    
-    # get image center
-    center_x, center_y = frame.shape[1] // 2, frame.shape[0] // 2
-
-    # calculate distance from center
-    def distance_from_center(x1, y1, x2, y2, cx, cy):
-        mid_x, mid_y = (x1 + x2) / 2, (y1 + y2) / 2
-        return np.sqrt((mid_x - cx) ** 2 + (mid_y - cy) ** 2)
-    
-    # filter lines based on distance from center
-    max_distance = 110
-    filtered_lines = []
-    if lines is not None:
-        for line in lines:
-            x1, y1, x2, y2 = line[0]
-            distance = distance_from_center(x1, y1, x2, y2, center_x, center_y)
-            if distance < max_distance:
-                filtered_lines.append(line)
-    
-    # draw lines on
-    line_image = np.zeros_like(frame)
-    for line in filtered_lines:
-        x1, y1, x2, y2 = line[0]
-        cv2.line(line_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-    
-    combined_image = cv2.addWeighted(frame, 0.8, line_image, 1, 0)
-    
-    # display image
-    #cv2.imshow('Adaptive Threshold', adaptive_thresh)
-    #cv2.imshow('Eroded', eroded)
-    #cv2.imshow('Canny', edges)
-    cv2.imshow('Detected Lines', combined_image)
-
 if __name__ == "__main__":
     #image_path = 'stock_image_cropped.jpg'
     #balls = detect_balls('stock_image_cropped.jpg')
@@ -233,39 +251,66 @@ if __name__ == "__main__":
 
     # Settings adjustment GUI
     pygame.init()
-    width, height = 600, 500
+    width, height = 700, 700
     screen = pygame.display.set_mode((width, height))
     pygame.display.set_caption('Adjust Settings')
 
     sliders = {
-        "CANNY_T_LOW": Slider(300, 60, 250, 0, 255, 50),
-        "CANNY_T_HIGH": Slider(300, 100, 250, 0, 255, 150),
-        "CANNY_APERTURE": Slider(300, 140, 250, 3, 7, 3, step=2),
-        "HOUGH_THRESHOLD": Slider(300, 220, 250, 0, 255, 70),
-        "HOUGH_LINE_LENGTH_MIN": Slider(300, 260, 250, 0, 255, 60),
-        "HOUGH_LINE_GAP_MAX": Slider(300, 300, 250, 0, 255, 20),
-        "CONNECT_DIST_MIN": Slider(300, 380, 250, 0, 255, 30),
-        "CONNECT_ANGLE_MAX": Slider(300, 420, 250, 0, 30, 10)
+        "CANNY_T_LOW": Slider(300, 60, 250, 0, 255, CANNY_T_LOW),
+        "CANNY_T_HIGH": Slider(300, 100, 250, 0, 255, CANNY_T_HIGH),
+        "CANNY_APERTURE": Slider(300, 140, 250, 3, 7, CANNY_APERTURE, step=2),
+        "HOUGH_THRESHOLD": Slider(300, 220, 250, 0, 255, HOUGH_THRESHOLD),
+        "HOUGH_LINE_LENGTH_MIN": Slider(300, 260, 250, 0, 255, HOUGH_LINE_LENGTH_MIN),
+        "HOUGH_LINE_GAP_MAX": Slider(300, 300, 250, 0, 255, HOUGH_LINE_GAP_MAX),
+        "CONNECT_DIST_MIN": Slider(300, 380, 250, 0, 255, CONNECT_DIST_MIN),
+        "CONNECT_ANGLE_MAX": Slider(300, 420, 250, 0, 30, CONNECT_ANGLE_MAX)
     }
+
+    camera_button = Button(100, 500, 100, 40, "Camera")
+    image_button = Button(220, 500, 100, 40, "Image")
+    left_arrow = ArrowButton(100, 550, "left")
+    right_arrow = ArrowButton(300, 550, "right")
 
     cap = cv2.VideoCapture(1)
 
-    while True:
+    running = True
+
+    while running:
         ret, frame = cap.read()
         screen.fill(WHITE)
 
         if not ret:
             break
 
-        # Event handling
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            elif event.type == pygame.MOUSEBUTTONDOWN or event.type == pygame.MOUSEMOTION:
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                pos = event.pos
                 if pygame.mouse.get_pressed()[0]:  # Check if the left mouse button is held down
                     for name, slider in sliders.items():
-                        slider.update(event.pos)
-                        globals()[name] = slider.value
+                        slider.update(pos)
+                        globals()[name] = slider.value  # Update the corresponding variable
+
+                    if camera_button.is_clicked(pos):
+                        camera_button.active = True
+                        image_button.active = False
+                        image_mode_selected = False
+
+                    if image_button.is_clicked(pos):
+                        image_button.active = True
+                        camera_button.active = False
+                        image_mode_selected = True
+
+                    if image_mode_selected:
+                        if left_arrow.is_clicked(pos):
+                            current_image_index = (current_image_index - 1) % len(image_file_names)
+                        if right_arrow.is_clicked(pos):
+                            current_image_index = (current_image_index + 1) % len(image_file_names)
+            
+            elif event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
+                for slider in sliders.values():
+                    slider.handle_event(event)
 
         # Draw headings and sliders
         draw_text(screen, "Canny Edge Detection", (50, 20), color=RED, size=36)
@@ -290,12 +335,21 @@ if __name__ == "__main__":
         draw_text(screen, "CONNECT_ANGLE_MAX", (50, 420))
         sliders["CONNECT_ANGLE_MAX"].draw(screen)
 
+        draw_text(screen, "CV Analysis", (50, 470), color=RED, size=36)
+        camera_button.draw(screen)
+        image_button.draw(screen)
+
+        # Show arrows and image filename if image mode is selected
+        if image_mode_selected:
+            left_arrow.draw(screen)
+            right_arrow.draw(screen)
+            draw_text(screen, image_file_names[current_image_index], (400, 560), size=30)
+
         # Update the display
         pygame.display.flip()
 
         #detect_balls(frame)
         detect_line(frame)
-        #detect_cline(frame)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break

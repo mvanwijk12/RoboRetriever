@@ -1,6 +1,54 @@
 import cv2
 import numpy as np
+import pygame
 from scipy.interpolate import griddata
+
+# Variables
+CANNY_T_LOW = 50
+CANNY_T_HIGH = 150
+CANNY_APERTURE = 5
+HOUGH_THRESHOLD = 70
+HOUGH_LINE_LENGTH_MIN = 60
+HOUGH_LINE_GAP_MAX = 20
+CONNECT_DIST_MIN = 30
+CONNECT_ANGLE_MAX = 10
+
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+RED = (255, 0, 0)
+
+class Slider:
+    def __init__(self, x, y, w, min_val, max_val, start_val, step=1):
+        self.rect = pygame.Rect(x, y, w, 20)
+        self.min_val = min_val
+        self.max_val = max_val
+        self.value = start_val
+        self.step = step
+        self.circle_pos = self.get_circle_pos()
+
+    def get_circle_pos(self):
+        ratio = (self.value - self.min_val) / (self.max_val - self.min_val)
+        return (self.rect.x + int(ratio * self.rect.width), self.rect.y + 10)
+
+    def draw(self, screen):
+        pygame.draw.rect(screen, BLACK, self.rect, 2)
+        pygame.draw.circle(screen, BLACK, self.circle_pos, 10)
+        font = pygame.font.Font(None, 24)
+        value_text = font.render(f'{int(self.value)}', True, BLACK)
+        screen.blit(value_text, (self.rect.right + 10, self.rect.y))
+
+    def update(self, pos):
+        if self.rect.collidepoint(pos):
+            ratio = (pos[0] - self.rect.x) / self.rect.width
+            self.value = self.min_val + round(ratio * (self.max_val - self.min_val) / self.step) * self.step
+            self.value = max(min(self.value, self.max_val), self.min_val)
+            self.circle_pos = self.get_circle_pos()
+
+def draw_text(screen, text, pos, color=BLACK, size=30):
+    font = pygame.font.Font(None, size)
+    text_surface = font.render(text, True, color)
+    screen.blit(text_surface, pos)
+
 
 def translate_points(circles):
     calibration_data = {
@@ -24,7 +72,6 @@ def translate_points(circles):
     # print the results
     for circle in real_world_circles:
         print(f"Center: {circle['center']}, Real-world radius: {circle['radius']} meters")
-
 
 def detect_balls(frame):
     # convert to HSV colour space
@@ -78,16 +125,16 @@ def detect_line(frame):
     eroded = cv2.erode(dilated, kernel, iterations=1)
 
     # edge detection
-    edges = cv2.Canny(eroded, 50, 150)
+    edges = cv2.Canny(eroded, CANNY_T_LOW, CANNY_T_HIGH, apertureSize=CANNY_APERTURE)
 
     # Hough line transform
-    lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=80, minLineLength=30, maxLineGap=20)
+    lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=HOUGH_THRESHOLD, minLineLength=HOUGH_LINE_LENGTH_MIN, maxLineGap=HOUGH_LINE_GAP_MAX)
 
     # draw lines
     line_image = np.zeros_like(frame)
 
     # Function to connect line segments that are close and aligned
-    def connect_lines(lines, min_distance=20, angle_threshold=10):
+    def connect_lines(lines, min_distance=CONNECT_DIST_MIN, angle_threshold=CONNECT_ANGLE_MAX):
         if lines is None:
             return []
         
@@ -114,10 +161,10 @@ def detect_line(frame):
         #print("   x1  y1  x2  y2")
         for line in connected_lines:
             x1, y1, x2, y2 = line[0]
-            print(line)
+            #print(line)
             cv2.line(line_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-    combined_image = cv2.addWeighted(frame, 0.8, line_image, 1, 0)
+    combined_image = cv2.addWeighted(frame, 0.5, line_image, 1, 0)
 
     # display image
     #cv2.imshow('Adaptive Threshold', adaptive_thresh)
@@ -184,19 +231,74 @@ if __name__ == "__main__":
     #lines = detect_line('tennis_court.jpg')
     #close_lines = detect_cline('tennis_court.jpg')
 
+    # Settings adjustment GUI
+    pygame.init()
+    width, height = 600, 500
+    screen = pygame.display.set_mode((width, height))
+    pygame.display.set_caption('Adjust Settings')
+
+    sliders = {
+        "CANNY_T_LOW": Slider(300, 60, 250, 0, 255, 50),
+        "CANNY_T_HIGH": Slider(300, 100, 250, 0, 255, 150),
+        "CANNY_APERTURE": Slider(300, 140, 250, 3, 7, 3, step=2),
+        "HOUGH_THRESHOLD": Slider(300, 220, 250, 0, 255, 70),
+        "HOUGH_LINE_LENGTH_MIN": Slider(300, 260, 250, 0, 255, 60),
+        "HOUGH_LINE_GAP_MAX": Slider(300, 300, 250, 0, 255, 20),
+        "CONNECT_DIST_MIN": Slider(300, 380, 250, 0, 255, 30),
+        "CONNECT_ANGLE_MAX": Slider(300, 420, 250, 0, 30, 10)
+    }
+
     cap = cv2.VideoCapture(1)
 
     while True:
         ret, frame = cap.read()
+        screen.fill(WHITE)
+
         if not ret:
             break
 
+        # Event handling
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN or event.type == pygame.MOUSEMOTION:
+                if pygame.mouse.get_pressed()[0]:  # Check if the left mouse button is held down
+                    for slider in sliders.values():
+                        slider.update(event.pos)
+
+        # Draw headings and sliders
+        draw_text(screen, "Canny Edge Detection", (50, 20), color=RED, size=36)
+        draw_text(screen, "CANNY_T_LOW", (50, 60))
+        sliders["CANNY_T_LOW"].draw(screen)
+        draw_text(screen, "CANNY_T_HIGH", (50, 100))
+        sliders["CANNY_T_HIGH"].draw(screen)
+        draw_text(screen, "CANNY_APERTURE", (50, 140))
+        sliders["CANNY_APERTURE"].draw(screen)
+
+        draw_text(screen, "Hough Line Transform", (50, 180), color=RED, size=36)
+        draw_text(screen, "HOUGH_THRESHOLD", (50, 220))
+        sliders["HOUGH_THRESHOLD"].draw(screen)
+        draw_text(screen, "HOUGH_LINE_LENGTH_MIN", (50, 260))
+        sliders["HOUGH_LINE_LENGTH_MIN"].draw(screen)
+        draw_text(screen, "HOUGH_LINE_GAP_MAX", (50, 300))
+        sliders["HOUGH_LINE_GAP_MAX"].draw(screen)
+
+        draw_text(screen, "Line Connection", (50, 340), color=RED, size=36)
+        draw_text(screen, "CONNECT_DIST_MIN", (50, 380))
+        sliders["CONNECT_DIST_MIN"].draw(screen)
+        draw_text(screen, "CONNECT_ANGLE_MAX", (50, 420))
+        sliders["CONNECT_ANGLE_MAX"].draw(screen)
+
+        # Update the display
+        pygame.display.flip()
+
         #detect_balls(frame)
         #detect_line(frame)
-        detect_cline(frame)
+        #detect_cline(frame)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
     cap.release()
     cv2.destroyAllWindows()
+    pygame.quit()

@@ -14,7 +14,8 @@ CONNECT_DIST_MIN = 75
 CONNECT_ANGLE_MAX = 5
 
 image_mode_selected = False
-image_file_names = ['tennis_court.jpg', 'stock_image_cropped.jpg']
+folder = "court_lines/"
+image_file_names = ['20240820_124438.jpg', '20240820_124447.jpg','20240820_124451.jpg','20240820_124509.jpg','20240820_124511.jpg','20240820_124521.jpg','20240820_124524.jpg','20240820_124535.jpg','20240820_124539.jpg','20240820_124551.jpg']
 current_image_index = 0
 
 WHITE = (255, 255, 255)
@@ -339,8 +340,9 @@ if __name__ == "__main__":
             left_arrow.draw(screen)
             right_arrow.draw(screen)
 
-            frame = cv2.imread(image_file_names[current_image_index])
-            draw_text(screen, image_file_names[current_image_index], (150, 560), size=15)
+            frame_orig = cv2.imread(folder+image_file_names[current_image_index])
+            frame = cv2.resize(frame_orig, (1008, 756), interpolation=cv2.INTER_AREA)
+            draw_text(screen, image_file_names[current_image_index], (150, 560), size=25)
         else:
             # camera
             ret, frame = cap.read()

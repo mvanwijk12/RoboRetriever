@@ -14,7 +14,7 @@ CONNECT_DIST_MIN = 75
 CONNECT_ANGLE_MAX = 5
 
 image_mode_selected = False
-image_file_names = ["image1.jpg", "image2.jpg", "image3.jpg"]
+image_file_names = ['tennis_court.jpg', 'stock_image_cropped.jpg']
 current_image_index = 0
 
 WHITE = (255, 255, 255)
@@ -251,9 +251,9 @@ if __name__ == "__main__":
 
     # Settings adjustment GUI
     pygame.init()
-    width, height = 700, 700
+    width, height = 700, 650
     screen = pygame.display.set_mode((width, height))
-    pygame.display.set_caption('Adjust Settings')
+    pygame.display.set_caption('Adjust CV Settings')
 
     sliders = {
         "CANNY_T_LOW": Slider(300, 60, 250, 0, 255, CANNY_T_LOW),
@@ -269,18 +269,13 @@ if __name__ == "__main__":
     camera_button = Button(100, 500, 100, 40, "Camera")
     image_button = Button(220, 500, 100, 40, "Image")
     left_arrow = ArrowButton(100, 550, "left")
-    right_arrow = ArrowButton(300, 550, "right")
+    right_arrow = ArrowButton(350, 550, "right")
 
     cap = cv2.VideoCapture(1)
-
     running = True
 
     while running:
-        ret, frame = cap.read()
         screen.fill(WHITE)
-
-        if not ret:
-            break
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -343,7 +338,15 @@ if __name__ == "__main__":
         if image_mode_selected:
             left_arrow.draw(screen)
             right_arrow.draw(screen)
-            draw_text(screen, image_file_names[current_image_index], (400, 560), size=30)
+
+            frame = cv2.imread(image_file_names[current_image_index])
+            draw_text(screen, image_file_names[current_image_index], (150, 560), size=15)
+        else:
+            # camera
+            ret, frame = cap.read()
+
+            if not ret:
+                break
 
         # Update the display
         pygame.display.flip()

@@ -145,42 +145,6 @@ def translate_points(circles):
     for circle in real_world_circles:
         print(f"Center: {circle['center']}, Real-world radius: {circle['radius']} meters")
 
-def detect_balls(frame):
-    # convert to HSV colour space
-    hsv_image = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-
-    # set HSV range for tennis ball colours - can be fine tuned
-    lower_hsv = np.array([29, 86, 6])
-    upper_hsv = np.array([64, 255, 255])
-
-    # create mask for the HSV colours and add blur to reduce noise
-    mask = cv2.inRange(hsv_image, lower_hsv, upper_hsv)
-    blurred_mask = cv2.GaussianBlur(mask, (9, 9), 2)  # (9,9) 
-
-    # remove more noise and improve circular shape
-    kernel = np.ones((5,5), np.uint8)
-    opened_mask = cv2.morphologyEx(blurred_mask, cv2.MORPH_OPEN, kernel)
-    closed_mask = cv2.morphologyEx(opened_mask, cv2.MORPH_CLOSE, kernel)
-
-    # find contours
-    contours, _ = cv2.findContours(closed_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    # TODO: calibration to provide real world values
-
-    for contour in contours:
-        (x,y), radius = cv2.minEnclosingCircle(contour)
-        centre = (int(x), int(y))
-        radius = int(radius)  # this is our distance measurement
-        print("Centre: ", centre, " & radius: ", radius)
-
-        if radius > 10:
-            cv2.circle(frame, centre, radius, (0,255,0), 2)
-            cv2.circle(frame, centre, 2, (0,0,255), 3)
-            
-    # display image
-    #cv2.imshow('Mask', closed_mask)
-    cv2.imshow('Detected Tennis Balls', frame)
-
 def detect_line(frame):
     # convert to greyscale
     grey_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -343,8 +307,9 @@ if __name__ == "__main__":
             frame_orig = cv2.imread(folder+image_file_names[current_image_index])
             frame = cv2.resize(frame_orig, (1008, 756), interpolation=cv2.INTER_AREA)
             draw_text(screen, image_file_names[current_image_index], (150, 560), size=25)
+
+
         else:
-            # camera
             ret, frame = cap.read()
 
             if not ret:
@@ -353,7 +318,6 @@ if __name__ == "__main__":
         # Update the display
         pygame.display.flip()
 
-        #detect_balls(frame)
         detect_line(frame)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):

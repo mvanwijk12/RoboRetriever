@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import pygame
+import time
 from scipy.interpolate import griddata
 
 # Variables
@@ -15,7 +16,12 @@ CONNECT_ANGLE_MAX = 5
 
 image_mode_selected = False
 folder = "court_lines/"
-image_file_names = ['20240820_124438.jpg', '20240820_124447.jpg','20240820_124451.jpg','20240820_124509.jpg','20240820_124511.jpg','20240820_124521.jpg','20240820_124524.jpg','20240820_124535.jpg','20240820_124539.jpg','20240820_124551.jpg']
+image_file_names = ['20240820_124438.jpg', '20240820_124447.jpg','20240820_124451.jpg','20240820_124509.jpg','20240820_124511.jpg','20240820_124521.jpg',
+                    '20240820_124524.jpg','20240820_124535.jpg','20240820_124539.jpg','20240820_124551.jpg','20240820_124554.jpg','20240820_124603.jpg',
+                    '20240820_124612.jpg','20240820_124619.jpg','20240820_124626.jpg','20240820_124701.jpg','20240820_124708.jpg','20240820_124732.jpg'
+                    '20240820_124734.jpg','20240820_124745.jpg','20240820_124802.jpg','20240820_124804.jpg','20240820_124806.jpg','20240820_124808.jpg'
+                    '20240820_124810.jpg','20240820_124820.jpg','20240820_124821.jpg','20240820_124826.jpg','20240820_124827.jpg','20240820_124831.jpg'
+                    '20240820_124833.jpg','20240820_124835.jpg','20240820_124838.jpg']
 current_image_index = 0
 
 WHITE = (255, 255, 255)
@@ -121,7 +127,6 @@ def draw_text(screen, text, pos, color=BLACK, size=30):
     text_surface = font.render(text, True, color)
     screen.blit(text_surface, pos)
 
-
 def translate_points(circles):
     calibration_data = {
         (100, 100): 0.05,  # at (100, 100) pixels, 1 pixel = 0.05 meters
@@ -203,20 +208,12 @@ def detect_line(frame):
     combined_image = cv2.addWeighted(frame, 0.5, line_image, 1, 0)
 
     # display image
-    #cv2.imshow('Adaptive Threshold', adaptive_thresh)
-    #cv2.imshow('Eroded', eroded)
-    #cv2.imshow('Canny', edges)
     cv2.imshow('Detected Lines', combined_image)
 
 if __name__ == "__main__":
-    #image_path = 'stock_image_cropped.jpg'
-    #balls = detect_balls('stock_image_cropped.jpg')
-    #lines = detect_line('tennis_court.jpg')
-    #close_lines = detect_cline('tennis_court.jpg')
-
     # Settings adjustment GUI
     pygame.init()
-    width, height = 700, 650
+    width, height = 700, 630
     screen = pygame.display.set_mode((width, height))
     pygame.display.set_caption('Adjust CV Settings')
 
@@ -230,6 +227,8 @@ if __name__ == "__main__":
         "CONNECT_DIST_MIN": Slider(300, 380, 250, 0, 255, CONNECT_DIST_MIN),
         "CONNECT_ANGLE_MAX": Slider(300, 420, 250, 0, 30, CONNECT_ANGLE_MAX)
     }
+
+    slider_values_changed = False
 
     camera_button = Button(100, 500, 100, 40, "Camera")
     image_button = Button(220, 500, 100, 40, "Image")
@@ -251,16 +250,19 @@ if __name__ == "__main__":
                     for name, slider in sliders.items():
                         slider.update(pos)
                         globals()[name] = slider.value  # Update the corresponding variable
+                        slider_values_changed = True
 
                     if camera_button.is_clicked(pos):
                         camera_button.active = True
                         image_button.active = False
                         image_mode_selected = False
+                        slider_values_changed = False
 
                     if image_button.is_clicked(pos):
                         image_button.active = True
                         camera_button.active = False
                         image_mode_selected = True
+                        slider_values_changed = True
 
                     if image_mode_selected:
                         if left_arrow.is_clicked(pos):
@@ -268,7 +270,7 @@ if __name__ == "__main__":
                         if right_arrow.is_clicked(pos):
                             current_image_index = (current_image_index + 1) % len(image_file_names)
             
-            elif event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
+            elif event.type == pygame.KEYDOWN or event.type == pygame.TEXTINPUT:
                 for slider in sliders.values():
                     slider.handle_event(event)
 
@@ -305,20 +307,20 @@ if __name__ == "__main__":
             right_arrow.draw(screen)
 
             frame_orig = cv2.imread(folder+image_file_names[current_image_index])
-            frame = cv2.resize(frame_orig, (1008, 756), interpolation=cv2.INTER_AREA)
+            frame = cv2.resize(frame_orig, (504, 378), interpolation=cv2.INTER_AREA)
             draw_text(screen, image_file_names[current_image_index], (150, 560), size=25)
 
-
+            if slider_values_changed:
+                detect_line(frame)
+                slider_values_changed = False
         else:
             ret, frame = cap.read()
-
             if not ret:
                 break
-
+            detect_line(frame)
+            
         # Update the display
         pygame.display.flip()
-
-        detect_line(frame)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break

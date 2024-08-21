@@ -29,6 +29,8 @@ RED = (255, 0, 0)
 LIGHT_GREY = (200, 200, 200)
 BLUE = (0, 0, 255)
 
+connected_lines = []
+
 class Slider:
     def __init__(self, x, y, w, min_val, max_val, start_val, step=1):
         self.rect = pygame.Rect(x, y, w, 20)
@@ -201,7 +203,6 @@ def detect_line(frame):
         #print("   x1  y1  x2  y2")
         for line in connected_lines:
             x1, y1, x2, y2 = line[0]
-            #print(line)
             cv2.line(line_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
     combined_image = cv2.addWeighted(frame, 0.5, line_image, 1, 0)
@@ -212,7 +213,7 @@ def detect_line(frame):
 if __name__ == "__main__":
     # Settings adjustment GUI
     pygame.init()
-    width, height = 700, 630
+    width, height = 700, 700
     screen = pygame.display.set_mode((width, height))
     pygame.display.set_caption('Adjust CV Settings')
 
@@ -271,7 +272,8 @@ if __name__ == "__main__":
             
             elif event.type == pygame.KEYDOWN or event.type == pygame.TEXTINPUT:
                 for slider in sliders.values():
-                    slider.handle_event(event)
+                    if slider.input_active:
+                        slider.handle_event(event)
 
         # Draw headings and sliders
         draw_text(screen, "Canny Edge Detection", (50, 20), color=RED, size=36)
@@ -299,6 +301,12 @@ if __name__ == "__main__":
         draw_text(screen, "CV Analysis", (50, 470), color=RED, size=36)
         camera_button.draw(screen)
         image_button.draw(screen)
+
+        y_offset = 600
+        for line in connected_lines:
+            print(line)
+            draw_text(screen, line, (50, y_offset))
+            y_offset += 30
 
         # Show arrows and image filename if image mode is selected
         if image_mode_selected:

@@ -125,36 +125,46 @@ if __name__ == "__main__":
         robot = Drive()
 
         while True:
-            print("Robot ready for driving")
-            req_mode = input("Enter driving type, 1 for straight line, 2 for turn on spot: ")
+            print("Robot ready for driving\n")
+            req_mode = input("Enter driving type, 1 for straight line, 2 for turn on spot: ")1
             if req_mode == 1:
                 req_detail = input("Enter direction, 1 for forward, 2 for backward: ")
                 if req_detail == 1:
                     robot.set_1D_direction(dirForward=True)
                     req_parameter = input("Enter desired distance in metres: ")
+                    print("Caution: Robot is moving\n")
+                    sleep(1)
                     robot.drive(distance=req_parameter, speed=0.2)
                     sleep(req_parameter * 5 + 1)
                 if req_detail == 2:
                     robot.set_1D_direction(dirForward=False)
                     req_parameter = input("Enter desired distance in metres: ")
+                    print("Caution: Robot is moving\n")
+                    sleep(1)
                     robot.drive(distance=req_parameter, speed=0.2)
                     sleep(req_parameter * 5 + 1)
                 else:
-                    print("Enter parameter value as required, returning to start of drive request")
+                    print("Enter parameter value as required, returning to start of drive request\n")
             if req_mode == 2:
                 req_detail = input("Enter turn direction, 1 for left, 2 for right: ")
                 if req_detail == 1:
                     req_parameter = input("Enter desired angle in degrees: ")
+                    print("Caution: Robot is moving\n")
+                    sleep(1)
                     robot.turn_through_angle(speed=0.05,angle=req_parameter,dir_left=True)
                     # Robot moves wheels at 50mm/s, using both wheels to turn in a ~1m circumference around the centre of the robot
                     sleep(req_parameter / 18 + 1)
                 if req_detail == 2:
                     req_parameter = input("Enter desired angle in degrees: ")
+                    print("Caution: Robot is moving\n")
+                    sleep(1)
                     robot.turn_through_angle(speed=0.05,angle=req_parameter,dir_left=False)
                     # Robot moves wheels at 50mm/s, using both wheels to turn in a ~1m circumference around the centre of the robot
                     sleep(req_parameter / 18 + 1)
                 else:
-                    print("Enter parameter value as required, returning to start of drive request")
+                    print("Enter parameter value as required, returning to start of drive request\n")
+            else:
+                print("Enter parameter value as required, returning to start of drive request\n")
 
     except KeyboardInterrupt:
         # terminate gracefully

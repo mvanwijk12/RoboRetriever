@@ -1,4 +1,4 @@
-import numpy
+import math
 import time
 
 class Controller:
@@ -29,19 +29,19 @@ class Controller:
         return p + i + d
 
     def homing_multiplier(self, inp):
-        leftwheel_multilpier = numpy.tanh(inp)+1
-        rightwheel_multiplier = numpy.tanh(-inp)+1
+        leftwheel_multilpier = math.tanh(inp)+1
+        rightwheel_multiplier = math.tanh(-inp)+1
 
         return leftwheel_multilpier, rightwheel_multiplier
 
 
 
-if __name__ == "__main__":
-    controller = Controller(0.0002,0,0)
-    # provide to the PID function the error from the centreline. so "pixel_from_left" - centreline
-    out = controller.PID(-700)
-    lwheel, rwheel = controller.homing_multiplier(out)
-    print('left wheel ', round(lwheel,2), ', right wheel ', round(rwheel,2))
-    # assuming we get a value between 0 and [width of image] say 600 for now.
+# if __name__ == "__main__":
+    # controller = Controller(0.0002,0,0)
+    # # provide to the PID function the error from the centreline. so "pixel_from_left" - centreline
+    # error = input("enter error:")
+    # out = controller.PID(error)
+    # lwheel, rwheel = controller.homing_multiplier(out)
+    # print('left wheel ', round(lwheel,2), ', right wheel ', round(rwheel,2))
 
   

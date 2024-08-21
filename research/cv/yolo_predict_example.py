@@ -17,6 +17,9 @@ model = YOLO("yolov8n.pt")
 # results = model("https://ultralytics.com/images/bus.jpg")
 results = model(img)
 
+# Print results
+print(results[0].probs)
+
 # Visualize the results
-for result in results:
-    result.show()
+# for result in results:
+#     result.show()

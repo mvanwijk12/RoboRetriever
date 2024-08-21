@@ -7,19 +7,19 @@ from scipy.interpolate import griddata
 CANNY_T_LOW = 50
 CANNY_T_HIGH = 150
 CANNY_APERTURE = 3
-HOUGH_THRESHOLD = 100
+HOUGH_THRESHOLD = 150
 HOUGH_LINE_LENGTH_MIN = 165
 HOUGH_LINE_GAP_MAX = 65
 CONNECT_DIST_MIN = 75
-CONNECT_ANGLE_MAX = 5
+CONNECT_ANGLE_MAX = 4
 
 image_mode_selected = False
 folder = "court_lines/"
-image_file_names = ['20240820_124438.jpg', '20240820_124447.jpg','20240820_124451.jpg','20240820_124509.jpg','20240820_124511.jpg','20240820_124521.jpg',
+image_file_names = ['20240820_124438.jpg','20240820_124447.jpg','20240820_124451.jpg','20240820_124509.jpg','20240820_124511.jpg','20240820_124521.jpg',
                     '20240820_124524.jpg','20240820_124535.jpg','20240820_124539.jpg','20240820_124551.jpg','20240820_124554.jpg','20240820_124603.jpg',
-                    '20240820_124612.jpg','20240820_124619.jpg','20240820_124626.jpg','20240820_124701.jpg','20240820_124708.jpg','20240820_124732.jpg'
-                    '20240820_124734.jpg','20240820_124745.jpg','20240820_124802.jpg','20240820_124804.jpg','20240820_124806.jpg','20240820_124808.jpg'
-                    '20240820_124810.jpg','20240820_124820.jpg','20240820_124821.jpg','20240820_124826.jpg','20240820_124827.jpg','20240820_124831.jpg'
+                    '20240820_124612.jpg','20240820_124619.jpg','20240820_124626.jpg','20240820_124701.jpg','20240820_124708.jpg','20240820_124732.jpg',
+                    '20240820_124734.jpg','20240820_124745.jpg','20240820_124802.jpg','20240820_124804.jpg','20240820_124806.jpg','20240820_124808.jpg',
+                    '20240820_124810.jpg','20240820_124820.jpg','20240820_124821.jpg','20240820_124826.jpg','20240820_124827.jpg','20240820_124831.jpg',
                     '20240820_124833.jpg','20240820_124835.jpg','20240820_124838.jpg']
 current_image_index = 0
 
@@ -198,10 +198,8 @@ def detect_line(frame):
     connected_lines = connect_lines(lines)
     
     if connected_lines is not None:
-        #print("   x1  y1  x2  y2")
         for line in connected_lines:
             x1, y1, x2, y2 = line[0]
-            #print(line)
             cv2.line(line_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
     combined_image = cv2.addWeighted(frame, 0.5, line_image, 1, 0)
@@ -209,10 +207,12 @@ def detect_line(frame):
     # display image
     cv2.imshow('Detected Lines', combined_image)
 
+    return connected_lines
+
 if __name__ == "__main__":
     # Settings adjustment GUI
     pygame.init()
-    width, height = 700, 630
+    width, height = 700, 700
     screen = pygame.display.set_mode((width, height))
     pygame.display.set_caption('Adjust CV Settings')
 
@@ -271,7 +271,8 @@ if __name__ == "__main__":
             
             elif event.type == pygame.KEYDOWN or event.type == pygame.TEXTINPUT:
                 for slider in sliders.values():
-                    slider.handle_event(event)
+                    if slider.input_active:
+                        slider.handle_event(event)
 
         # Draw headings and sliders
         draw_text(screen, "Canny Edge Detection", (50, 20), color=RED, size=36)
@@ -310,8 +311,16 @@ if __name__ == "__main__":
             draw_text(screen, image_file_names[current_image_index], (100, 560), size=25)
 
             if slider_values_changed:
-                detect_line(frame)
+                lines_list = detect_line(frame)
                 slider_values_changed = False
+
+                y_offset = 500
+                print("\n#####################")
+                print("   x1  y1  x2  y2")
+                print(lines_list)
+                for line in lines_list:
+                    draw_text(screen, str(line), (150, y_offset))
+                    y_offset += 30
         else:
             ret, frame = cap.read()
             if not ret:

@@ -7,13 +7,13 @@ from scipy.interpolate import griddata
 CANNY_T_LOW = 50
 CANNY_T_HIGH = 150
 CANNY_APERTURE = 3
-HOUGH_THRESHOLD = 150
+HOUGH_THRESHOLD = 125
 HOUGH_LINE_LENGTH_MIN = 165
 HOUGH_LINE_GAP_MAX = 65
 CONNECT_DIST_MIN = 75
 CONNECT_ANGLE_MAX = 4
 
-image_mode_selected = False
+image_mode_selected = True
 folder = "court_lines/"
 image_file_names = ['20240820_124438.jpg','20240820_124447.jpg','20240820_124451.jpg','20240820_124509.jpg','20240820_124511.jpg','20240820_124521.jpg',
                     '20240820_124524.jpg','20240820_124535.jpg','20240820_124539.jpg','20240820_124551.jpg','20240820_124554.jpg','20240820_124603.jpg',
@@ -202,17 +202,89 @@ def detect_line(frame):
             x1, y1, x2, y2 = line[0]
             cv2.line(line_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-    combined_image = cv2.addWeighted(frame, 0.5, line_image, 1, 0)
+    # Trigger box
+    trigger_size = 0.5
+    trigger_offset = 0.2
+
+    # Define the trigger box (center of the image with a given size)
+    height, width = frame.shape[:2]
+    height_offset = int(height * trigger_offset)
+    box_center = (width // 2, height // 2 + height_offset)
+    box_size = int(min(width, height) * trigger_size)
+    box_x1 = box_center[0] - box_size // 2
+    box_y1 = box_center[1] - box_size // 2
+    box_x2 = box_center[0] + box_size // 2
+    box_y2 = box_center[1] + box_size // 2
+
+    # Draw the trigger box on the image
+    cv2.rectangle(line_image, (box_x1, box_y1), (box_x2, box_y2), RED, 2)
+
+    # Check if any line crosses the trigger box
+    triggered = False
+    angle = None
+    distance = None
+    if connected_lines is not None:
+        for line in connected_lines:
+            x1, y1, x2, y2 = line[0]
+
+            # Check for intersection with the trigger box boundaries
+            intersections = []
+            if box_x1 <= x1 <= box_x2 and box_y1 <= y1 <= box_y2:
+                intersections.append((x1, y1))
+            if box_x1 <= x2 <= box_x2 and box_y1 <= y2 <= box_y2:
+                intersections.append((x2, y2))
+            
+            # Calculate intersection with the box edges if endpoints are outside
+            def line_intersection(p1, p2, q1, q2):
+                """ Find the intersection of two lines (p1-p2) and (q1-q2). """
+                s1_x, s1_y = p2[0] - p1[0], p2[1] - p1[1]
+                s2_x, s2_y = q2[0] - q1[0], q2[1] - q1[1]
+                
+                s = (-s1_y * (p1[0] - q1[0]) + s1_x * (p1[1] - q1[1])) / (-s2_x * s1_y + s1_x * s2_y)
+                t = ( s2_x * (p1[1] - q1[1]) - s2_y * (p1[0] - q1[0])) / (-s2_x * s1_y + s1_x * s2_y)
+
+                if 0 <= s <= 1 and 0 <= t <= 1:
+                    int_x = p1[0] + (t * s1_x)
+                    int_y = p1[1] + (t * s1_y)
+                    return int(int_x), int(int_y)
+                return None
+
+            # Check intersection with each box edge
+            box_edges = [((box_x1, box_y1), (box_x2, box_y1)),
+                         ((box_x2, box_y1), (box_x2, box_y2)),
+                         ((box_x2, box_y2), (box_x1, box_y2)),
+                         ((box_x1, box_y2), (box_x1, box_y1))]
+
+            for edge in box_edges:
+                intersection = line_intersection((x1, y1), (x2, y2), edge[0], edge[1])
+                if intersection is not None:
+                    intersections.append(intersection)
+
+            # If we have two intersections, the line crosses the box
+            if len(intersections) == 2:
+                triggered = True
+                midpoint_x = (intersections[0][0] + intersections[1][0]) // 2
+                midpoint_y = (intersections[0][1] + intersections[1][1]) // 2
+                
+                # Calculate the angle from the box center to the midpoint
+                angle = np.arctan2(midpoint_y - box_center[1], midpoint_x - box_center[0]) * 180 / np.pi
+                angle = (angle + 450) % 360 # convert to 0 to 360 instead of -180 to 180
+
+                # Calculate the distance form the box center to the midpoint
+                distance = np.sqrt((midpoint_x - box_center[0])**2 + (midpoint_y - box_center[1])**2)
+
+                break  # Exit loop once a crossing line is found
 
     # display image
+    combined_image = cv2.addWeighted(frame, 0.5, line_image, 1, 0)
     cv2.imshow('Detected Lines', combined_image)
 
-    return connected_lines
+    return connected_lines, [triggered, angle, distance]
 
 if __name__ == "__main__":
     # Settings adjustment GUI
     pygame.init()
-    width, height = 700, 700
+    width, height = 650, 600
     screen = pygame.display.set_mode((width, height))
     pygame.display.set_caption('Adjust CV Settings')
 
@@ -311,21 +383,29 @@ if __name__ == "__main__":
             draw_text(screen, image_file_names[current_image_index], (100, 560), size=25)
 
             if slider_values_changed:
-                lines_list = detect_line(frame)
+                lines_list, trigger = detect_line(frame)
                 slider_values_changed = False
 
-                y_offset = 500
                 print("\n#####################")
-                print("   x1  y1  x2  y2")
-                print(lines_list)
-                for line in lines_list:
-                    draw_text(screen, str(line), (150, y_offset))
-                    y_offset += 30
+
+                # Provide output if the trigger box is crossed
+                if trigger[0]:
+                    print(f"Trigger Box Crossed! Angle: {trigger[1]:.2f} degrees, Distance: {trigger[2]:.2f} px")
+                else:
+                    print("No crossing detected.")
+
+                #print("   x1  y1  x2  y2")
+                #print(lines_list)
+
         else:
             ret, frame = cap.read()
             if not ret:
                 break
-            detect_line(frame)
+            lines_list, trigger = detect_line(frame)
+
+            print("\n#####################")
+            #print("   x1  y1  x2  y2")
+            #print(lines_list)
             
         # Update the display
         pygame.display.flip()

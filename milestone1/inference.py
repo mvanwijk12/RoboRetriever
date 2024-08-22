@@ -90,8 +90,8 @@ class Inference:
         #if self.filtered_detections.tracker_id is not None:
         labels = [f"error: {round(1/2*(self.filtered_detections.xyxy[0][0] + self.filtered_detections.xyxy[0][2])-1280/2, 2)}"]
 
-        annotated_image = box_annotator.annotate(scene=self.img_frame.copy(), detections=self.filtered_detections)
-        annotated_image = label_annotator.annotate(scene=annotated_image.copy(), detections=self.filtered_detections, labels=labels)
+        annotated_image = box_annotator.annotate(scene=self.img_frame, detections=self.filtered_detections)
+        annotated_image = label_annotator.annotate(scene=annotated_image, detections=self.filtered_detections, labels=labels)
 
         # Step 4: Plot the image with bounding boxes
         cv2.imshow('annotated_img', annotated_image)

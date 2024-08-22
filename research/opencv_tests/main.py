@@ -12,6 +12,8 @@ HOUGH_LINE_LENGTH_MIN = 165
 HOUGH_LINE_GAP_MAX = 65
 CONNECT_DIST_MIN = 75
 CONNECT_ANGLE_MAX = 4
+TRIGGER_SIZE = 0.5
+TRIGGER_OFFSET = 0.2
 
 image_mode_selected = True
 folder = "court_lines/"
@@ -202,15 +204,11 @@ def detect_line(frame):
             x1, y1, x2, y2 = line[0]
             cv2.line(line_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-    # Trigger box
-    trigger_size = 0.5
-    trigger_offset = 0.2
-
     # Define the trigger box (center of the image with a given size)
     height, width = frame.shape[:2]
-    height_offset = int(height * trigger_offset)
+    height_offset = int(height * TRIGGER_OFFSET)
     box_center = (width // 2, height // 2 + height_offset)
-    box_size = int(min(width, height) * trigger_size)
+    box_size = int(min(width, height) * TRIGGER_SIZE)
     box_x1 = box_center[0] - box_size // 2
     box_y1 = box_center[1] - box_size // 2
     box_x2 = box_center[0] + box_size // 2
@@ -284,7 +282,7 @@ def detect_line(frame):
 if __name__ == "__main__":
     # Settings adjustment GUI
     pygame.init()
-    width, height = 650, 600
+    width, height = 650, 730
     screen = pygame.display.set_mode((width, height))
     pygame.display.set_caption('Adjust CV Settings')
 
@@ -296,15 +294,17 @@ if __name__ == "__main__":
         "HOUGH_LINE_LENGTH_MIN": Slider(300, 260, 250, 0, 255, HOUGH_LINE_LENGTH_MIN),
         "HOUGH_LINE_GAP_MAX": Slider(300, 300, 250, 0, 255, HOUGH_LINE_GAP_MAX),
         "CONNECT_DIST_MIN": Slider(300, 380, 250, 0, 255, CONNECT_DIST_MIN),
-        "CONNECT_ANGLE_MAX": Slider(300, 420, 250, 0, 30, CONNECT_ANGLE_MAX)
+        "CONNECT_ANGLE_MAX": Slider(300, 420, 250, 0, 30, CONNECT_ANGLE_MAX),
+        "TRIGGER_SIZE": Slider(300, 500, 250, 0.1, 0.9, TRIGGER_SIZE, step=0.1),
+        "TRIGGER_OFFSET": Slider(300, 540, 250, 0, 0.5, TRIGGER_OFFSET, step=0.1)
     }
 
     slider_values_changed = False
 
-    camera_button = Button(50, 500, 100, 40, "Camera")
-    image_button = Button(170, 500, 100, 40, "Image")
-    left_arrow = ArrowButton(50, 550, "left")
-    right_arrow = ArrowButton(300, 550, "right")
+    camera_button = Button(50, 620, 100, 40, "Camera")
+    image_button = Button(170, 620, 100, 40, "Image")
+    left_arrow = ArrowButton(50, 670, "left")
+    right_arrow = ArrowButton(300, 670, "right")
 
     cap = cv2.VideoCapture(1)
     running = True
@@ -369,7 +369,13 @@ if __name__ == "__main__":
         draw_text(screen, "CONNECT_ANGLE_MAX", (50, 420))
         sliders["CONNECT_ANGLE_MAX"].draw(screen)
 
-        draw_text(screen, "CV Analysis", (50, 470), color=RED, size=36)
+        draw_text(screen, "Trigger Box", (50, 460), color=RED, size=36)
+        draw_text(screen, "TRIGGER_SIZE", (50, 500))
+        sliders["TRIGGER_SIZE"].draw(screen)
+        draw_text(screen, "TRIGGER_OFFSET", (50, 540))
+        sliders["TRIGGER_OFFSET"].draw(screen)
+
+        draw_text(screen, "CV Analysis", (50, 580), color=RED, size=36)
         camera_button.draw(screen)
         image_button.draw(screen)
 
@@ -380,7 +386,7 @@ if __name__ == "__main__":
 
             frame_orig = cv2.imread(folder+image_file_names[current_image_index])
             frame = cv2.resize(frame_orig, (504, 378), interpolation=cv2.INTER_AREA)
-            draw_text(screen, image_file_names[current_image_index], (100, 560), size=25)
+            draw_text(screen, image_file_names[current_image_index], (100, 680), size=25)
 
             if slider_values_changed:
                 lines_list, trigger = detect_line(frame)

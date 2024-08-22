@@ -60,7 +60,7 @@ class Inference:
                 data={key: value[mask] for key, value in detections.data.items()} if detections.data else None
             )
 
-            self.img_frame = cv2.cvtColor(result.orig_img, cv2.COLOR_BGR2RGB)
+            self.img_frame = result.orig_img
             
             # if a tennis ball is detected we have a new frame
             if len(self.filtered_detections.xyxy) > 0:
@@ -74,21 +74,34 @@ class Inference:
             with self.condition:
                 self.condition.wait()
 
+        self.has_new = False 
+        return self.filtered_detections
+    
+    def read_plot(self):
+        if not self.has_new:
+            with self.condition:
+                self.condition.wait()
+
         self.has_new = False
         box_annotator = sv.BoxAnnotator()  # Create a BoxAnnotator
+        label_annotator = sv.LabelAnnotator()
+
+        #labels = []
+        #if self.filtered_detections.tracker_id is not None:
+        labels = [f"error: {round(1/2*(self.filtered_detections.xyxy[0][0] + self.filtered_detections.xyxy[0][2])-1280/2, 2)}"]
+
         annotated_image = box_annotator.annotate(scene=self.img_frame.copy(), detections=self.filtered_detections)
+        annotated_image = label_annotator.annotate(scene=annotated_image.copy(), detections=self.filtered_detections, labels=labels)
 
         # Step 4: Plot the image with bounding boxes
-        plt.figure(figsize=(10, 10))
-        plt.imshow(annotated_image)
-        plt.axis('off')  # Hide axes
-        plt.show()
+        cv2.imshow('annotated_img', annotated_image)
+        cv2.waitKey(1)  
+        return None
 
-        return
 
 if __name__ == "__main__":
-    cap = Inference().start()
+    cap = Inference(src='tcp://raspberry.local:8554').start()
     while True:
-        frame = cap.read()
-        sleep(2)
-    
+        cap.read_plot()
+        # cv2.imshow('frame', frame)
+        # cv2.waitKey(1)

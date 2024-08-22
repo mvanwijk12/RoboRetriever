@@ -36,22 +36,22 @@ class Inference:
         while True:
             if self.stopped: return
 
+            # Capture frame
             self.frame = self.stream.read()
-            result = self.model.track(source=self.frame, persist=True, conf=conf)[0]
-            # class_ids = result.boxes.cls.cpu().numpy().astype(int)
-            # img_frame = result.orig_img
+
+            # Run inference
+            result = self.model.track(source=self.frame, persist=True, conf=conf, verbose=False)[0]
+            self.class_names = result.names
 
             # Convert to sv detection object
             detections = sv.Detections.from_ultralytics(result)
             if result.boxes.id is not None:
                 detections.tracker_id = result.boxes.id.cpu().numpy().astype(int) # TODO: replace with cuda instead of cpu()?
 
-            # Filter detections to only keep desired classes
-            # self.filtered_detections = [d for d in detections if d.class_id in self.desired_class_ids]
-            # self.img_frame = result.orig_img
+            # Filter detections to only keep desired classes using mask
             mask = np.isin(detections.class_id, self.desired_class_ids)
 
-            # Step 2: Apply the mask to filter the detections
+            # Apply the mask to filter the detections
             self.filtered_detections = sv.Detections(
                 xyxy=detections.xyxy[mask],
                 confidence=detections.confidence[mask],
@@ -60,13 +60,13 @@ class Inference:
                 data={key: value[mask] for key, value in detections.data.items()} if detections.data else None
             )
 
+            # Retrieve the image
             self.img_frame = result.orig_img
             
-            # if a tennis ball is detected we have a new frame
-            if len(self.filtered_detections.xyxy) > 0:
-                with self.condition:
-                    self.has_new = True
-                    self.condition.notify_all()
+            # We have a new frame
+            with self.condition:
+                self.has_new = True
+                self.condition.notify_all()
 
     def read(self):
         """ Reads a frame from the stream """
@@ -86,16 +86,22 @@ class Inference:
         box_annotator = sv.BoxAnnotator()  # Create a BoxAnnotator
         label_annotator = sv.LabelAnnotator()
 
-        #labels = []
-        #if self.filtered_detections.tracker_id is not None:
-        labels = [f"error: {round(1/2*(self.filtered_detections.xyxy[0][0] + self.filtered_detections.xyxy[0][2])-1280/2, 2)}"]
+        labels = []
+        if len(self.filtered_detections.xyxy) > 0:
+            # labels = [f"error: {round(1/2*(self.filtered_detections.xyxy[0][0] + self.filtered_detections.xyxy[0][2])-1280/2, 2)}"]
+            print("adding label...")
+            labels = [
+                    f"#{self.class_names[class_id]} {confidence:0.2f} error: {1/2*(xyxy[0] + xyxy[2])-1280/2:0.2f}"
+                    for class_id, confidence, xyxy
+                    in zip(self.filtered_detections.class_id, self.filtered_detections.confidence, self.filtered_detections.xyxy)
+                ]
 
         annotated_image = box_annotator.annotate(scene=self.img_frame, detections=self.filtered_detections)
         annotated_image = label_annotator.annotate(scene=annotated_image, detections=self.filtered_detections, labels=labels)
 
         # Step 4: Plot the image with bounding boxes
         cv2.imshow('annotated_img', annotated_image)
-        cv2.waitKey(1)  
+        cv2.waitKey(5)  
         return None
 
 

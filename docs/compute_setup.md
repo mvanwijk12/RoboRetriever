@@ -34,3 +34,7 @@ To test if CUDA has been installed correctly in a python shell <br/>
 `import torch` <br/>
 `torch.cuda.is_available()` <br/>
 This should return `True` if installed correctly
+
+## Windows Schanigans
+Using conda with VS Code
+https://stackoverflow.com/questions/54828713/working-with-anaconda-in-visual-studio-code

@@ -19,7 +19,14 @@ class Connection:
 
     def close(self):
         ''' Closes the connection '''
-        pass
+        print(f"Closing connection to {(self.host, self.port)}")
+        try:
+            self.sock.close()
+        except OSError as e:
+            print(f"Error: socket.close() exception for {(self.host, self.port)}: {e!r}")
+        finally:
+            # Delete reference to socket object for garbage collection
+            self.sock = None
         
     def _create_request(self, detections):
         ''' Sets up dict to send '''
@@ -33,36 +40,38 @@ class Connection:
         ''' Send the detections over the network '''
         # Convert detection dict to encoded dictionary
         request = self._create_request(detections)
+        message = libclient.Message(self.sock, (self.host, self.port), request)
         
         try:
             # This will send all the 
-            request.write()
+            message.write()
 
         except (socket.error, ConnectionResetError) as e:
             for i in range(self.MAX_RECONNECTION):
                 try:
                     # Try to reconnect
-                    print(f"Error sending data: {e}. Attempting to reconnect...")
+                    print(f"Error: {e}. Attempting to reconnect...")
                     sock.close()
                     time.sleep(3)  # Wait before reconnecting
+
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     self.sock.setblocking(False)
                     self.sock.connect_ex((self.host, self.port))
                     print("Reconnected to server.")
                     request.write()
 
-                except socket.error as e:
+                except (socket.error, ConnectionResetError) as e:
                     print(f"Attempt {i + 1}/{self.MAX_RECONNECTION} Failed to reconnect: {e}")
                     
                 else:
                     break
-        
-        #finally:
-            #sel.close()
+            else:
+                print('Max reconnection attempts reached. Exiting...')
+
         
 
 if __name__ == "__main__":
-    sel = selectors.DefaultSelector()
+    con = Connection()
     # cap = Inference().start()
     while True:
         detections = dict(
@@ -72,7 +81,7 @@ if __name__ == "__main__":
                     tracker_id=np.array([3]).tolist(),
                     data={'class_name': np.array(['sports ball'], dtype='<U13').tolist()}
                 )
-        send_detections(detections)
+        con.send_detections(detections)
         time.sleep(0.5)
 
 

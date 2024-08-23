@@ -9,25 +9,25 @@ class Message:
         self.sock = sock
         self.addr = addr
         self.request = request
-        self._recv_buffer = b""
+        # self._recv_buffer = b""
         self._send_buffer = b""
         self._request_queued = False
-        self._jsonheader_len = None
-        self.jsonheader = None
-        self.response = None
+        # self._jsonheader_len = None
+        # self.jsonheader = None
+        # self.response = None
 
-    def _read(self):
-        try:
-            # Should be ready to read
-            data = self.sock.recv(4096)
-        except BlockingIOError:
-            # Resource temporarily unavailable (errno EWOULDBLOCK)
-            pass
-        else:
-            if data:
-                self._recv_buffer += data
-            else:
-                raise RuntimeError("Peer closed.")
+    # def _read(self):
+    #     try:
+    #         # Should be ready to read
+    #         data = self.sock.recv(4096)
+    #     except BlockingIOError:
+    #         # Resource temporarily unavailable (errno EWOULDBLOCK)
+    #         pass
+    #     else:
+    #         if data:
+    #             self._recv_buffer += data
+    #         else:
+    #             raise RuntimeError("Peer closed.")
 
     def _write(self):
         if self._send_buffer:
@@ -44,13 +44,13 @@ class Message:
     def _json_encode(self, obj, encoding):
         return json.dumps(obj, ensure_ascii=False).encode(encoding)
 
-    def _json_decode(self, json_bytes, encoding):
-        tiow = io.TextIOWrapper(
-            io.BytesIO(json_bytes), encoding=encoding, newline=""
-        )
-        obj = json.load(tiow)
-        tiow.close()
-        return obj
+    # def _json_decode(self, json_bytes, encoding):
+    #     tiow = io.TextIOWrapper(
+    #         io.BytesIO(json_bytes), encoding=encoding, newline=""
+    #     )
+    #     obj = json.load(tiow)
+    #     tiow.close()
+    #     return obj
 
     def _create_message(
         self, *, content_bytes, content_type, content_encoding
@@ -66,28 +66,28 @@ class Message:
         message = message_hdr + jsonheader_bytes + content_bytes
         return message
 
-    def _process_response_json_content(self):
-        content = self.response
-        result = content.get("result")
-        print(f"Got result: {result}")
+    # def _process_response_json_content(self):
+    #     content = self.response
+    #     result = content.get("result")
+    #     print(f"Got result: {result}")
 
-    def _process_response_binary_content(self):
-        content = self.response
-        print(f"Got response: {content!r}")
+    # def _process_response_binary_content(self):
+    #     content = self.response
+    #     print(f"Got response: {content!r}")
 
-    def read(self):
-        self._read()
+    # def read(self):
+    #     self._read()
 
-        if self._jsonheader_len is None:
-            self.process_protoheader()
+    #     if self._jsonheader_len is None:
+    #         self.process_protoheader()
 
-        if self._jsonheader_len is not None:
-            if self.jsonheader is None:
-                self.process_jsonheader()
+    #     if self._jsonheader_len is not None:
+    #         if self.jsonheader is None:
+    #             self.process_jsonheader()
 
-        if self.jsonheader:
-            if self.response is None:
-                self.process_response()
+    #     if self.jsonheader:
+    #         if self.response is None:
+    #             self.process_response()
 
     def write(self):
         if not self._request_queued:
@@ -95,23 +95,23 @@ class Message:
         self._write()
 
 
-    def close(self):
-        print(f"Closing connection to {self.addr}")
-        try:
-            self.selector.unregister(self.sock)
-        except Exception as e:
-            print(
-                f"Error: selector.unregister() exception for "
-                f"{self.addr}: {e!r}"
-            )
+    # def close(self):
+    #     print(f"Closing connection to {self.addr}")
+    #     try:
+    #         self.selector.unregister(self.sock)
+    #     except Exception as e:
+    #         print(
+    #             f"Error: selector.unregister() exception for "
+    #             f"{self.addr}: {e!r}"
+    #         )
 
-        try:
-            self.sock.close()
-        except OSError as e:
-            print(f"Error: socket.close() exception for {self.addr}: {e!r}")
-        finally:
-            # Delete reference to socket object for garbage collection
-            self.sock = None
+    #     try:
+    #         self.sock.close()
+    #     except OSError as e:
+    #         print(f"Error: socket.close() exception for {self.addr}: {e!r}")
+    #     finally:
+    #         # Delete reference to socket object for garbage collection
+    #         self.sock = None
 
     def queue_request(self):
         content = self.request["content"]
@@ -133,48 +133,48 @@ class Message:
         self._send_buffer += message
         self._request_queued = True
 
-    def process_protoheader(self):
-        hdrlen = 2
-        if len(self._recv_buffer) >= hdrlen:
-            self._jsonheader_len = struct.unpack(
-                ">H", self._recv_buffer[:hdrlen]
-            )[0]
-            self._recv_buffer = self._recv_buffer[hdrlen:]
+    # def process_protoheader(self):
+    #     hdrlen = 2
+    #     if len(self._recv_buffer) >= hdrlen:
+    #         self._jsonheader_len = struct.unpack(
+    #             ">H", self._recv_buffer[:hdrlen]
+    #         )[0]
+    #         self._recv_buffer = self._recv_buffer[hdrlen:]
 
-    def process_jsonheader(self):
-        hdrlen = self._jsonheader_len
-        if len(self._recv_buffer) >= hdrlen:
-            self.jsonheader = self._json_decode(
-                self._recv_buffer[:hdrlen], "utf-8"
-            )
-            self._recv_buffer = self._recv_buffer[hdrlen:]
-            for reqhdr in (
-                "byteorder",
-                "content-length",
-                "content-type",
-                "content-encoding",
-            ):
-                if reqhdr not in self.jsonheader:
-                    raise ValueError(f"Missing required header '{reqhdr}'.")
+    # def process_jsonheader(self):
+    #     hdrlen = self._jsonheader_len
+    #     if len(self._recv_buffer) >= hdrlen:
+    #         self.jsonheader = self._json_decode(
+    #             self._recv_buffer[:hdrlen], "utf-8"
+    #         )
+    #         self._recv_buffer = self._recv_buffer[hdrlen:]
+    #         for reqhdr in (
+    #             "byteorder",
+    #             "content-length",
+    #             "content-type",
+    #             "content-encoding",
+    #         ):
+    #             if reqhdr not in self.jsonheader:
+    #                 raise ValueError(f"Missing required header '{reqhdr}'.")
 
-    def process_response(self):
-        content_len = self.jsonheader["content-length"]
-        if not len(self._recv_buffer) >= content_len:
-            return
-        data = self._recv_buffer[:content_len]
-        self._recv_buffer = self._recv_buffer[content_len:]
-        if self.jsonheader["content-type"] == "text/json":
-            encoding = self.jsonheader["content-encoding"]
-            self.response = self._json_decode(data, encoding)
-            print(f"Received response {self.response!r} from {self.addr}")
-            self._process_response_json_content()
-        else:
-            # Binary or unknown content-type
-            self.response = data
-            print(
-                f"Received {self.jsonheader['content-type']} "
-                f"response from {self.addr}"
-            )
-            self._process_response_binary_content()
-        # Close when response has been processed
-        self.close()
+    # def process_response(self):
+    #     content_len = self.jsonheader["content-length"]
+    #     if not len(self._recv_buffer) >= content_len:
+    #         return
+    #     data = self._recv_buffer[:content_len]
+    #     self._recv_buffer = self._recv_buffer[content_len:]
+    #     if self.jsonheader["content-type"] == "text/json":
+    #         encoding = self.jsonheader["content-encoding"]
+    #         self.response = self._json_decode(data, encoding)
+    #         print(f"Received response {self.response!r} from {self.addr}")
+    #         self._process_response_json_content()
+    #     else:
+    #         # Binary or unknown content-type
+    #         self.response = data
+    #         print(
+    #             f"Received {self.jsonheader['content-type']} "
+    #             f"response from {self.addr}"
+    #         )
+    #         self._process_response_binary_content()
+    #     # Close when response has been processed
+    #     self.close()

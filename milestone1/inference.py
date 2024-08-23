@@ -89,7 +89,6 @@ class Inference:
         labels = []
         if len(self.filtered_detections.xyxy) > 0:
             # labels = [f"error: {round(1/2*(self.filtered_detections.xyxy[0][0] + self.filtered_detections.xyxy[0][2])-1280/2, 2)}"]
-            print("adding label...")
             labels = [
                     f"#{self.class_names[class_id]} {confidence:0.2f} error: {1/2*(xyxy[0] + xyxy[2])-1280/2:0.2f}"
                     for class_id, confidence, xyxy
@@ -106,7 +105,7 @@ class Inference:
 
 
 if __name__ == "__main__":
-    cap = Inference(src='tcp://raspberry.local:8554').start()
+    cap = Inference().start()
     while True:
         cap.read_plot()
         # cv2.imshow('frame', frame)

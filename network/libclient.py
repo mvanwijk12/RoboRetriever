@@ -1,13 +1,11 @@
 import io
 import json
-import selectors
 import struct
 import sys
 
 
 class Message:
-    def __init__(self, selector, sock, addr, request):
-        self.selector = selector
+    def __init__(self, sock, addr, request):
         self.sock = sock
         self.addr = addr
         self.request = request
@@ -17,18 +15,6 @@ class Message:
         self._jsonheader_len = None
         self.jsonheader = None
         self.response = None
-
-    def _set_selector_events_mask(self, mode):
-        """Set selector to listen for events: mode is 'r', 'w', or 'rw'."""
-        if mode == "r":
-            events = selectors.EVENT_READ
-        elif mode == "w":
-            events = selectors.EVENT_WRITE
-        elif mode == "rw":
-            events = selectors.EVENT_READ | selectors.EVENT_WRITE
-        else:
-            raise ValueError(f"Invalid events mask mode {mode!r}.")
-        self.selector.modify(self.sock, events, data=self)
 
     def _read(self):
         try:
@@ -89,12 +75,6 @@ class Message:
         content = self.response
         print(f"Got response: {content!r}")
 
-    def process_events(self, mask):
-        if mask & selectors.EVENT_READ:
-            self.read()
-        if mask & selectors.EVENT_WRITE:
-            self.write()
-
     def read(self):
         self._read()
 
@@ -112,13 +92,8 @@ class Message:
     def write(self):
         if not self._request_queued:
             self.queue_request()
-
         self._write()
 
-        if self._request_queued:
-            if not self._send_buffer:
-                # Set selector to listen for read events, we're done writing.
-                self._set_selector_events_mask("r")
 
     def close(self):
         print(f"Closing connection to {self.addr}")

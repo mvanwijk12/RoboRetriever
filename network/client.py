@@ -8,60 +8,55 @@ import numpy as np
 import time
 
 class Connection:
-    def __init__(self):
-        pass
-
-    def start(self):
-        ''' Starts the connection '''
-        pass
+    def __init__(self, hostname='127.0.0.1', port=65432):
+        self.host = hostname
+        self.port = port
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.setblocking(False)
+        print(f"Starting connection to {(self.host, self.port)}")
+        self.sock.connect_ex((self.host, self.port))
+        self.MAX_RECONNECTION = 10
 
     def close(self):
         ''' Closes the connection '''
         pass
         
-    def create_request(detections):
+    def _create_request(self, detections):
         ''' Sets up dict to send '''
         return dict(
             type="text/json",
             encoding="utf-8",
             content=detections
         )
-
-    def start_connection(HOST, PORT, request):
-        ''' Starts up connection with HOST '''
-        addr = (HOST, PORT)
-        print(f"Starting connection to {addr}")
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.setblocking(False)
-        sock.connect_ex(addr)
-        events = selectors.EVENT_READ | selectors.EVENT_WRITE
-        message = libclient.Message(sel, sock, addr, request)
-        sel.register(sock, events, data=message)
-
-    def send_detections(detections):
-        HOST, PORT = '127.0.0.1', 65432
-        request = create_request(detections)
-        start_connection(HOST, PORT, request)
-
+        
+    def send_detections(self, detections):
+        ''' Send the detections over the network '''
+        # Convert detection dict to encoded dictionary
+        request = self._create_request(detections)
+        
         try:
-            while True:
-                events = sel.select(timeout=1)
-                for key, mask in events:
-                    message = key.data
-                    try:
-                        message.process_events(mask)
-                    except Exception:
-                        print(
-                            f"Main: Error: Exception for {message.addr}:\n"
-                            f"{traceback.format_exc()}"
-                        )
-                        message.close()
-                # Check for a socket being monitored to continue.
-                if not sel.get_map():
-                    print('breaking out of while True loop...')
+            # This will send all the 
+            request.write()
+
+        except (socket.error, ConnectionResetError) as e:
+            for i in range(self.MAX_RECONNECTION):
+                try:
+                    # Try to reconnect
+                    print(f"Error sending data: {e}. Attempting to reconnect...")
+                    sock.close()
+                    time.sleep(3)  # Wait before reconnecting
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    self.sock.setblocking(False)
+                    self.sock.connect_ex((self.host, self.port))
+                    print("Reconnected to server.")
+                    request.write()
+
+                except socket.error as e:
+                    print(f"Attempt {i + 1}/{self.MAX_RECONNECTION} Failed to reconnect: {e}")
+                    
+                else:
                     break
-        except KeyboardInterrupt:
-            print("Caught keyboard interrupt, exiting")
+        
         #finally:
             #sel.close()
         

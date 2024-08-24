@@ -1,22 +1,22 @@
 # This is the main code
-import cv2
 import pigpio
-import numpy as np
-from ultralytics import YOLO
 import time
 import RPi.GPIO as GPIO
 from drive import Drive
 from Pcontrol import Controller
 from server import ConnectionServer
 
-# Set up GPIO mode
-GPIO.setmode(GPIO.BCM)
+####### fix limmit switch to be an interrupt so we don't accidentally miss the event of pressing it
+# # Set up GPIO mode
+# GPIO.setmode(GPIO.BCM)
 
-# Define GPIO pin for the limit switch
-LIMIT_SWITCH_PIN = 10 # set this
+# # Define GPIO pin for the limit switch
+# LIMIT_SWITCH_PIN = 10 # set this
 
-# Set up the GPIO pin as an input
-GPIO.setup(LIMIT_SWITCH_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+# # Set up the GPIO pin as an input
+# GPIO.setup(LIMIT_SWITCH_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+con = ConnectionServer().start()
 
 # set up storage for path to allow reverse to drive home
 stored_pathway = []
@@ -25,6 +25,9 @@ lwheel_sum = 0
 rwheel_sum = 0
 # position of line in image
 angle_line = None
+
+timeout = 20
+start_time = int(time.time())
 
 # test code fake values
 
@@ -65,13 +68,16 @@ while True:
 
     ## Detect when reached target (ball hits limit switch)
     ##get from limit switch = targetreached = true
-    if GPIO.input(LIMIT_SWITCH_PIN) == False:
+    #if GPIO.input(LIMIT_SWITCH_PIN) == False:
+
+    if time.time() - start_time >= timeout:
         # drive backwards, retrace our steps
         robot = Drive()
-        robot.set_1D_direction(dirForward=False)
+        robot.set_1D_direction(dirForward=True)
         for current_actionLR in stored_pathway:
             # run through all the steps we took backwards, setting our left wheel as right and right as left.
-            robot.drive(speed=0.2, leftwheel_multilpier=current_actionLR[1], rightwheel_multiplier=current_actionLR[0])
+            robot.drive(speed=0.1, leftwheel_multilpier=current_actionLR[1], rightwheel_multiplier=current_actionLR[0])
+        break
     # # or the other wway of doing this
     # if GPIO.input(LIMIT_SWITCH_PIN) == False:
     #     # drive backwards by the summed proportional amount of each wheel
@@ -87,20 +93,20 @@ while True:
 
 
     ## fetch error of ball position from the laptop
-    con = ConnectionServer().start()
+    
     try:
-        while True:
-            print(f'MESSAGE IS {con.get_message()}')
-            x = con.get_message()
+        print(f'MESSAGE IS {con.get_message()}')
+        x = con.get_message()
+        if x is not None:
             error = x["error"]
     except KeyboardInterrupt:
         con.close()
         print('closing..')
 
-    if error is None:
+    if x is None:
         robot = Drive()
-        robot.set_1D_direction(dirForward=True)
-        robot.drive(distance=1, speed=0.2)
+        robot.set_1D_direction(dirForward=False)
+        robot.drive(distance=1, speed=0.1)
     else:
         ### run the pcontrol for one movement
         # input to controller includes the gains kp, ki, kd. these can be adjusted for tuning
@@ -117,5 +123,5 @@ while True:
         rwheel_sum += rwheel
         print('left wheel ', round(lwheel,2), ', right wheel ', round(rwheel,2))
         robot = Drive()
-        robot.set_1D_direction(dirForward=True)
-        robot.drive(speed=0.2, leftwheel_multilpier=lwheel, rightwheel_multiplier=rwheel)
+        robot.set_1D_direction(dirForward=False)
+        robot.drive(speed=0.1, leftwheel_multilpier=lwheel, rightwheel_multiplier=rwheel)

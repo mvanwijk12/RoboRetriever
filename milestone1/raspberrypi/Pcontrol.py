@@ -36,12 +36,12 @@ class Controller:
 
 
 
-# if __name__ == "__main__":
-    # controller = Controller(0.0002,0,0)
-    # # provide to the PID function the error from the centreline. so "pixel_from_left" - centreline
-    # error = input("enter error:")
-    # out = controller.PID(error)
-    # lwheel, rwheel = controller.homing_multiplier(out)
-    # print('left wheel ', round(lwheel,2), ', right wheel ', round(rwheel,2))
+if __name__ == "__main__":
+    controller = Controller(0.0002,0,0)
+    # provide to the PID function the error from the centreline. so "pixel_from_left" - centreline
+    error = input("enter error:")
+    out = controller.PID(error)
+    lwheel, rwheel = controller.homing_multiplier(out)
+    print('left wheel ', round(lwheel,2), ', right wheel ', round(rwheel,2))
 
   

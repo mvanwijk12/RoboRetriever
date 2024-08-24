@@ -21,7 +21,7 @@ class Inference:
         self.condition = Condition()
         self.frame = None
         self.model = YOLO(model_path)
-        self.desired_class_ids = self.model.name['sports ball']
+        self.desired_class_ids = [key for key, value in self.model.names.items() if value == 'sports ball']
         self.img_frame = None
 
     def start(self):

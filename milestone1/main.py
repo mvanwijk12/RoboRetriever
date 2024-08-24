@@ -72,18 +72,18 @@ while True:
         for current_actionLR in stored_pathway:
             # run through all the steps we took backwards, setting our left wheel as right and right as left.
             robot.drive(speed=0.2, leftwheel_multilpier=current_actionLR[1], rightwheel_multiplier=current_actionLR[0])
-    # or
-    if GPIO.input(LIMIT_SWITCH_PIN) == False:
-        # drive backwards by the summed proportional amount of each wheel
-        robot.Drive()
-        robot.set_1D_direction(dirForward=False)
-        lwheel_norm = lwheel_sum/rwheel_sum
-        rwheel_norm = 1
-        # drive turning by proportional total amount
-        robot.drive(speed=0.2, leftwheel_multilpier=rwheel_norm, rightwheel_multiplier=lwheel_norm)
-        travelled_distance = int(stored_pathway.length/2)
-        # drive straight for the distance travelled.
-        robot.drive(distance=travelled_distance,speed=0.2, leftwheel_multilpier=0.5, rightwheel_multiplier=0.5)
+    # # or the other wway of doing this
+    # if GPIO.input(LIMIT_SWITCH_PIN) == False:
+    #     # drive backwards by the summed proportional amount of each wheel
+    #     robot.Drive()
+    #     robot.set_1D_direction(dirForward=False)
+    #     lwheel_norm = lwheel_sum/rwheel_sum
+    #     rwheel_norm = 1
+    #     # drive turning by proportional total amount
+    #     robot.drive(speed=0.2, leftwheel_multilpier=rwheel_norm, rightwheel_multiplier=lwheel_norm)
+    #     travelled_distance = int(stored_pathway.length/2)
+    #     # drive straight for the distance travelled.
+    #     robot.drive(distance=travelled_distance,speed=0.2, leftwheel_multilpier=0.5, rightwheel_multiplier=0.5)
 
 
     ## fetch error of ball position from the laptop
@@ -96,7 +96,7 @@ while True:
     except KeyboardInterrupt:
         con.close()
         print('closing..')
-        
+
     if error is None:
         robot = Drive()
         robot.set_1D_direction(dirForward=True)

@@ -111,7 +111,7 @@ class Message:
 
     def process_events(self, mask):
         if mask & selectors.EVENT_READ:
-            self.read()
+            return self.read()
         # if mask & selectors.EVENT_WRITE:
         #     self.write()
 
@@ -127,7 +127,7 @@ class Message:
 
         if self.jsonheader:
             if self.request is None:
-                self.process_request()
+                return self.process_request()
 
     # def write(self):
     #     if self.request:
@@ -186,13 +186,13 @@ class Message:
         self._recv_buffer = self._recv_buffer[content_len:]
         if self.jsonheader["content-type"] == "text/json":
             encoding = self.jsonheader["content-encoding"]
-            self.request = self._json_decode(data, encoding)
-            print(f"Received request {self.request!r} from {self.addr}")
+            request = self._json_decode(data, encoding)
+            # print(f"Received request {self.request!r} from {self.addr}")
             
             # Setup for next read
             self._jsonheader_len = None
             self.jsonheader = None
-            self.request = None
+            # self.request = None
             
         else:
             # Binary or unknown content-type
@@ -201,6 +201,8 @@ class Message:
                 f"Received {self.jsonheader['content-type']} "
                 f"request from {self.addr}"
             )
+
+        return request
         # Set selector to listen for write events, we're done reading.
         # self._set_selector_events_mask("w")
 

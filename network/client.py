@@ -7,7 +7,7 @@ import libclient
 import numpy as np
 import time
 
-class Connection:
+class ConnectionClient:
     def __init__(self, hostname='127.0.0.1', port=65432):
         self.host = hostname
         self.port = port
@@ -71,7 +71,7 @@ class Connection:
         
 
 if __name__ == "__main__":
-    con = Connection()
+    con = ConnectionClient()
     # cap = Inference().start()
     while True:
         detections = dict(

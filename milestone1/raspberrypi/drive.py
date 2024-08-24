@@ -25,17 +25,19 @@ class Drive:
         :param dirR: GPIO pin connected to the right stepper motor driver direction pin
         :param dirL: GPIO pin connected to the left stepper motor driver direction pin
         """
+         # start the pigpiod daemon
+        os.system("sudo pigpiod")
         self.stepL = stepL
         self.stepR = stepR
         self.dirL = dirL
         self.dirR = dirR
         self.wheel_circumference = 55e-3 * math.pi # measured wheel diameter 55mm
-        self.traction_factor = 1
+        self.traction_factor = 0.9
         self.steps_per_rev = 200
         self.stepping_mode = 1/8 # Assume 1/8 stepping
         self.pi = pigpio.pi()
+        self.start_time = None
 
-        os.system("sudo pigpiod") # start the pigpiod daemon
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.dirL, GPIO.OUT)
         GPIO.setup(self.dirR, GPIO.OUT)
@@ -70,54 +72,53 @@ class Drive:
         # print(f'Required revs per second {req_revs_per_sec}')
         # print(f'Drive time {drive_time}s')
 
-        self.setup_timer("Timer 1", drive_time, self.timer_function) 
+        # self.setup_timer("Timer 1", drive_time, self.timer_function) 
+        
+        self.start_time = time.time()
         self.pi.hardware_PWM(self.stepL, int(left_steps_per_sec), 500000)
         self.pi.hardware_PWM(self.stepR, int(right_steps_per_sec), 500000)
-
-
-    def setup_timer(self, name, duration_seconds, function):
-        """Sets up a timer to execute a function after a certain duration."""
-        def timer_thread():
-            print(f"{name} timer started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            sleep(duration_seconds)
-            function(name)
-
-        thread = threading.Thread(target=timer_thread)
-        thread.start()
-
-    def timer_function(self, name):
-        """Function to be executed when the timer expires."""
+        while time.time() - self.start_time < drive_time:
+            pass
         self.pi.hardware_PWM(self.stepL, 0, 500000)
         self.pi.hardware_PWM(self.stepR, 0, 500000)
-        print(f"{name} timer expired at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+
+    # def setup_timer(self, name, duration_seconds, function):
+    #     """Sets up a timer to execute a function after a certain duration."""
+    #     def timer_thread():
+    #         #print(f"{name} timer started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    #         sleep(duration_seconds)
+    #         function(name)
+
+    #     thread = threading.Thread(target=timer_thread)
+    #     thread.start()
+
+    # def timer_function(self, name):
+    #     """Function to be executed when the timer expires."""
+        
+    #     %print(f"{name} timer expired at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
    
 if __name__ == "__main__":
-    
-    try:
-        controller = Controller(0.0008,0,0)
-        # provide to the PID function the error from the centreline. so "pixel_from_left" - centreline
-        error = input("enter error:")
-        out = controller.PID(int(error))
-        lwheel, rwheel = controller.homing_multiplier(out)
-        print('left wheel ', round(lwheel,2), ', right wheel ', round(rwheel,2))
-        robot = Drive()
-        robot.set_1D_direction(dirForward=False)
-        robot.drive(speed=0.2, leftwheel_multilpier=lwheel, rightwheel_multiplier=rwheel)
-        # again
-        error = input("enter error:")
-        out = controller.PID(int(error))
-        lwheel, rwheel = controller.homing_multiplier(out)
-        print('left wheel ', round(lwheel,2), ', right wheel ', round(rwheel,2))
-        robot = Drive()
-        robot.set_1D_direction(dirForward=False)
-        robot.drive(speed=0.2, leftwheel_multilpier=lwheel, rightwheel_multiplier=rwheel)
-        # while True:
-        #     pass
+   robot = Drive()
+   while True: 
+        try:
+            controller = Controller(0.0008,0,0)
+            # provide to the PID function the error from the centreline. so "pixel_from_left" - centreline
+            error = input("enter error:")
+            out = controller.PID(int(error))
+            lwheel, rwheel = controller.homing_multiplier(out)
+            print('left wheel ', round(lwheel,2), ', right wheel ', round(rwheel,2))
+            
+            robot.set_1D_direction(dirForward=False)
+            robot.drive(distance=0.2, speed=0.2, leftwheel_multilpier=lwheel, rightwheel_multiplier=rwheel)
 
-    except KeyboardInterrupt:
-        # terminate gracefully
-        robot.pi.hardware_PWM(robot.stepL, 0, 500000)
-        robot.pi.hardware_PWM(robot.stepR, 0, 500000)
-        GPIO.cleanup()
-        sys.exit()
+            # while True:
+            #     pass
+
+        except KeyboardInterrupt:
+            # terminate gracefully
+            robot.pi.hardware_PWM(robot.stepL, 0, 500000)
+            robot.pi.hardware_PWM(robot.stepR, 0, 500000)
+            GPIO.cleanup()
+            sys.exit()

@@ -21,10 +21,10 @@ class RobotController:
         self.rwheel = 0.0
 
         # Set up GPIO mode
-        GPIO.setmode(GPIO.BCM)
+        #GPIO.setmode(GPIO.BCM)
         
         # Set up the GPIO pin as an input
-        GPIO.setup(LIMIT_SWITCH_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        #GPIO.setup(LIMIT_SWITCH_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
         # Initialize pigpio
         self.pi = pigpio.pi()
@@ -67,7 +67,8 @@ class RobotController:
             print('left wheel ', round(lwheel,2), ', right wheel ', round(rwheel,2))
             robot = Drive()
             robot.set_1D_direction(dirForward=False)
-            robot.drive(speed=0.2, leftwheel_multilpier=lwheel, rightwheel_multiplier=rwheel)
+            robot.drive(distance=0.2, speed=0.2, leftwheel_multilpier=lwheel, rightwheel_multiplier=rwheel)
+            #drive slowly slow down 
 
             
 

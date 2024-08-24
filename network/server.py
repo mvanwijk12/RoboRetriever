@@ -79,10 +79,14 @@ class ConnectionServer:
 
 
 if __name__ == "__main__":
-    con = ConnectionServer().start()
+    con = ConnectionServer(host='').start()
     try:
         while True:
-            print(f'MESSAGE IS {con.get_message()}')
+            x = con.get_message()
+            if x is not None:
+                print(f"ERROR IS {x['error']}")
+            else:
+                print("NO DETECTIONS")
     except KeyboardInterrupt:
         con.close()
         print('closing..')

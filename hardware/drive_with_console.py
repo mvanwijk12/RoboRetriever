@@ -33,6 +33,8 @@ class Drive:
         self.steps_per_rev = 200
         self.stepping_mode = 1/8 # Assume 1/8 stepping
         self.wheel_spacing = 0.29 # Measured distance between centres of wheels in m
+        self.drive_scaling = 1 # Scaling constant to correct forward/backward distance
+        self.turn_scaling = 1  # Scaling constant to correct turn angle
         self.pi = pigpio.pi()
 
         os.system("sudo pigpiod") # start the pigpiod daemon
@@ -106,11 +108,11 @@ class Drive:
     def turn_through_angle(self, speed=1, angle=1, dir_left=True):
         """Function to perform a turn through a specified angle in degrees"""
         # Wheel speed in m/s
-        wheel_speed = speed / (self.traction_factor * self.wheel_circumference)
         # Rotation speed in rev/s
-        rotation_speed = 2 * wheel_speed / (self.wheel_spacing * math.pi)    # Turning code rotates both wheels at the same time
+        rotation_rate = speed / (self.wheel_spacing * math.pi)
+        # Turning code rotates both wheels at the same time, so effectively each wheel is driving around a radius of half the wheel spacing
         angle_revs = angle / 360
-        turn_duration = angle_revs / rotation_speed
+        turn_duration = angle_revs / rotation_rate
         if dir_left:
             self.turn_left(speed, turn_duration)
         else:
@@ -124,45 +126,74 @@ if __name__ == "__main__":
     try:
         robot = Drive()
 
+        # Set the speed and rotation rate to use for drive commands
+        linear_speed = 0.2  # m/s
+        turning_speed = 0.1    # m/s wheel speed
+        approx_turn_rate = 360/0.9 * turning_speed # Approximate, used for delaying input only
+        
+        # Robot uses both wheels to turn in a ~0.9m circumference around the centre of the robot
+
         while True:
             print("Robot ready for driving\n")
             req_mode = input("Enter driving type, 1 for straight line, 2 for turn on spot: ")
-            if req_mode == 1:
+
+            if req_mode == "1":
                 req_detail = input("Enter direction, 1 for forward, 2 for backward: ")
-                if req_detail == 1:
+
+                if req_detail == "1":
                     robot.set_1D_direction(dirForward=True)
                     req_parameter = input("Enter desired distance in metres: ")
-                    print("Caution: Robot is moving\n")
-                    sleep(1)
-                    robot.drive(distance=req_parameter, speed=0.2)
-                    sleep(req_parameter * 5 + 1)
-                if req_detail == 2:
+                    try:
+                        req_dist = float(req_parameter)
+                        print("Caution: Robot is moving\n")
+                        sleep(1)
+                        robot.drive(distance=req_dist * robot.drive_scaling, speed=linear_speed)
+                        sleep(req_dist / linear_speed + 1)
+                    except ValueError:
+                        print("Invalid distance, returning to start of drive request")
+
+                if req_detail == "2":
                     robot.set_1D_direction(dirForward=False)
                     req_parameter = input("Enter desired distance in metres: ")
-                    print("Caution: Robot is moving\n")
-                    sleep(1)
-                    robot.drive(distance=req_parameter, speed=0.2)
-                    sleep(req_parameter * 5 + 1)
+                    try:
+                        req_dist = float(req_parameter)
+                        print("Caution: Robot is moving\n")
+                        sleep(1)
+                        robot.drive(distance=req_dist * robot.drive_scaling, speed=linear_speed)
+                        sleep(req_dist / linear_speed + 1)
+                    except ValueError:
+                        print("Invalid distance, returning to start of drive request")
                 else:
                     print("Enter parameter value as required, returning to start of drive request\n")
-            if req_mode == 2:
+
+            if req_mode == "2":
                 req_detail = input("Enter turn direction, 1 for left, 2 for right: ")
-                if req_detail == 1:
+
+                if req_detail == "1":
                     req_parameter = input("Enter desired angle in degrees: ")
-                    print("Caution: Robot is moving\n")
-                    sleep(1)
-                    robot.turn_through_angle(speed=0.05,angle=req_parameter,dir_left=True)
-                    # Robot moves wheels at 50mm/s, using both wheels to turn in a ~1m circumference around the centre of the robot
-                    sleep(req_parameter / 18 + 1)
-                if req_detail == 2:
+                    try:
+                        req_angle = float(req_parameter)
+                        print("Caution: Robot is moving\n")
+                        sleep(1)
+                        robot.turn_through_angle(speed=turning_speed,angle=req_angle * robot.turn_scaling,dir_left=True)
+                        sleep(req_angle / approx_turn_rate + 1)
+                    except ValueError:
+                        print("Invalid angle, returning to start of drive request")
+                    
+                if req_detail == "2":
                     req_parameter = input("Enter desired angle in degrees: ")
-                    print("Caution: Robot is moving\n")
-                    sleep(1)
-                    robot.turn_through_angle(speed=0.05,angle=req_parameter,dir_left=False)
-                    # Robot moves wheels at 50mm/s, using both wheels to turn in a ~1m circumference around the centre of the robot
-                    sleep(req_parameter / 18 + 1)
+                    try:
+                        req_angle = float(req_parameter)
+                        print("Caution: Robot is moving\n")
+                        sleep(1)
+                        robot.turn_through_angle(speed=turning_speed,angle=req_angle * robot.turn_scaling,dir_left=False)
+                        sleep(req_angle / approx_turn_rate + 1)
+                    except ValueError:
+                        print("Invalid angle, returning to start of drive request")
+
                 else:
                     print("Enter parameter value as required, returning to start of drive request\n")
+
             else:
                 print("Enter parameter value as required, returning to start of drive request\n")
 

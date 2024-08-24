@@ -13,6 +13,7 @@ import time
 import threading
 from datetime import datetime, timedelta
 import RPi.GPIO as GPIO
+from Pcontrol import Controller
 
 class Drive:
     """ Represents a robot drive object """
@@ -48,7 +49,7 @@ class Drive:
             GPIO.output(self.dirL, GPIO.LOW)
             GPIO.output(self.dirR, GPIO.HIGH)
 
-    def drive(self, distance=1, speed=1):
+    def drive(self, distance=0.5, speed=1, leftwheel_multilpier=1.0, rightwheel_multiplier=1.0):
         """ Function to start driving a specified distance in metres """
         req_revolutions = distance/(self.traction_factor * self.wheel_circumference)
         print(f'#revolutions {req_revolutions}')
@@ -59,6 +60,10 @@ class Drive:
         print(f'req_revs_per_sec {req_revs_per_sec}')
         req_steps_per_sec = req_revs_per_sec * self.steps_per_rev * (1/self.stepping_mode) # PWM freq
         print(f'pwm freq = {int(req_steps_per_sec)}')
+
+        # steering
+        left_steps_per_sec = req_steps_per_sec * leftwheel_multilpier
+        right_steps_per_sec = req_steps_per_sec  * rightwheel_multiplier
         
         drive_time = req_steps/(req_steps_per_sec)
         print(f'Required steps {req_steps}')
@@ -66,8 +71,8 @@ class Drive:
         print(f'Drive time {drive_time}s')
 
         self.setup_timer("Timer 1", drive_time, self.timer_function) 
-        self.pi.hardware_PWM(self.stepL, int(req_steps_per_sec), 500000)
-        self.pi.hardware_PWM(self.stepR, int(req_steps_per_sec), 500000)
+        self.pi.hardware_PWM(self.stepL, int(left_steps_per_sec), 500000)
+        self.pi.hardware_PWM(self.stepR, int(right_steps_per_sec), 500000)
 
 
     def setup_timer(self, name, duration_seconds, function):
@@ -90,9 +95,15 @@ class Drive:
 if __name__ == "__main__":
     
     try:
+        controller = Controller(0.0008,0,0)
+        # provide to the PID function the error from the centreline. so "pixel_from_left" - centreline
+        error = input("enter error:")
+        out = controller.PID(int(error))
+        lwheel, rwheel = controller.homing_multiplier(out)
+        print('left wheel ', round(lwheel,2), ', right wheel ', round(rwheel,2))
         robot = Drive()
         robot.set_1D_direction(dirForward=False)
-        robot.drive(speed=0.2)
+        robot.drive(speed=0.2, leftwheel_multilpier=lwheel, rightwheel_multiplier=rwheel)
         # while True:
         #     pass
 

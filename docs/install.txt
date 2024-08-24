@@ -1,0 +1,5 @@
+https://forums.raspberrypi.com/viewtopic.php?t=357695
+
+https://github.com/ultralytics/ultralytics
+
+https://github.com/jeffbass/imagezmq/tree/master

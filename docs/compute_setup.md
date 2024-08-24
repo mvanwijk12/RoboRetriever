@@ -7,7 +7,7 @@
    `conda activate RoboRetriever`
 5. Install pip in the newly created conda environment
   `conda install pip`
-6. Navigate to RoboRetriever/research/cv folder
+6. Navigate to RoboRetriever/milestone1/computer folder
 7. Install the required python packages
    `pip install -r requirements.txt`
 8. Note on some Windows machines you may encounter an OSError (OSError: [WinError 126] The specified module could not be found.

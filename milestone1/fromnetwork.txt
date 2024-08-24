@@ -1,0 +1,5 @@
+from laptop we need 3 aspects from the image.
+
+1. is there a line within x numbers of pixels from image centre? (meaning are we about to drive over the line?)
+2. is the detected ball at the bottom of the image frame? (using the xyxy stored make up a minimum pixel distance from bottom at which we believe we have arrived at ball)
+3. error of ball from centreline? (how many pixels horizontally from centreline is the ball? positive 100 is 100 pixels to right of image centre, -20 is 20 pixels to the left)

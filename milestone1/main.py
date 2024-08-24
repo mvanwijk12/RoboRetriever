@@ -3,67 +3,54 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 import time
+from drive import Drive
+from Pcontrol import Controller
 
+# set up storage for our path to allow reverse to drive home
+stored_pathway = []
 
 # Loop code
 while True:
-    # In ball detection mode
-    ## Capture image        
-    model = YOLO("yolov8n.pt")  # load an official detection model
+    ### fetch from laptop: are there any lines in danger zone?
+    # output from linedetect is an angle 
+    # if yes turn away from line
+    if(0<=angle_line<=180):
+        # line is in the right hand side of frame. so turn left
+        both_wheelsLR = [lwheel, rwheel]
+        stored_pathway.append(both_wheelsLR)
+        print('left wheel ', round(lwheel,2), ', right wheel ', round(rwheel,2))
+        robot = Drive()
+        robot.set_1D_direction(dirForward=True)
+        robot.drive(speed=0.2, leftwheel_multilpier=lwheel, rightwheel_multiplier=rwheel)
 
-    # Define the TCP URL for the video stream
-    stream_url = 'tcp://robo-retriever.local:8554'
 
-    # Open the video stream using OpenCV
-    cap = cv2.VideoCapture(stream_url)
+    ### Detect when reached target (ball is too close to bottom of frame)
+    # get from network = targetreached = true
+    if(targetReached=True):
+        # drive backwards
+        robot = Drive()
+        robot.set_1D_direction(dirForward=False)
+        for current_actionLR in length.stored_pathway:
+            # 
+            robot.drive(speed=0.2, leftwheel_multilpier=current_actionLR[1], rightwheel_multiplier=current_actionLR[0])
+    else:
+        ## fetch error of ball position from the laptop
+        error = () # output of inference file
 
-    if not cap.isOpened():
-        print("Error: Could not open video stream")
-        exit()
-
-    while True:
-        # Capture frame-by-frame
-        for i in range(100):
-            ret, frame = cap.read()
-
-        if not ret:
-            print("Failed to grab frame")
-            break
-
-        # Display the frame
-        results = model.track(source=frame)
-
-        # for result in results:
-        #     result.show()
-        #cv2.imshow('TCP Frame', frame)
-
-        # Get the names of the classes from the model
-        class_names = model.names 
-
-        # Identify the index of 'sports ball' in class_names
-        #print(class_names)
-        sports_ball_index = 32
-
-        # Filter out bounding boxes and other info for 'sports ball'
-        sports_ball_boxes = []
-        for result in results:  # results.xyxy[0] has [x1, y1, x2, y2, confidence, class]
-            print(result.boxes.cls)
-            print(result.boxes.conf)
-            if result.boxes.cls[0] == sports_ball_index:
-                sports_ball_boxes.append(result.boxes.xyxy)  # Append the bounding box [x1, y1, x2, y2]
-
-        # sports_ball_boxes now contains bounding boxes of all detected sports balls in the image
-        print(sports_ball_boxes)
-
-        ## ball detected?
-        ball_centre = NULL
-        if sports_ball_boxes != []:
-            # get ball x and y coords
-            # get ball centre
-            # subtract ball horizontal coordinate from "centreline"
-            # P control angle to target and drive forward
-            # repeat capture image stuff above
-            
-            # Detect when reached target
-            # if(targetReached):
+        ### run the pcontrol for one movement
+        # input to controller includes the gains kp, ki, kd. these can be adjusted for tuning
+        controller = Controller(0.0008,0,0)
+        # running PID uses the ball position error to make an adjustment
+        PIDout = controller.PID(int(error))
+        # homing takes output of PID 
+        lwheel, rwheel = controller.homing_multiplier(PIDout)
+        # save the multiplier for bth wheels together, used for reversing
+        both_wheelsLR = [lwheel, rwheel]
+        stored_pathway.append(both_wheelsLR)
+        print('left wheel ', round(lwheel,2), ', right wheel ', round(rwheel,2))
+        robot = Drive()
+        robot.set_1D_direction(dirForward=True)
+        robot.drive(speed=0.2, leftwheel_multilpier=lwheel, rightwheel_multiplier=rwheel)
+        
+    
             

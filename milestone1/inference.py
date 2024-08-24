@@ -25,14 +25,14 @@ class Inference:
         self.frame = None
         self.bboxes = None
         self.model = YOLO("yolov8n.pt")
-        self.desired_class_ids = [32]
+        self.desired_class_ids = self.model.name['sports ball']
         self.img_frame = None
 
     def start(self):
         Thread(target=self.process_image_update, args=()).start()
         return self
 
-    def process_image_update(self, conf=0.5):
+    def process_image_update(self, conf=0.2):
         while True:
             if self.stopped: return
 
@@ -100,13 +100,16 @@ class Inference:
 
         # Step 4: Plot the image with bounding boxes
         cv2.imshow('annotated_img', annotated_image)
-        cv2.waitKey(5)  
-        return None
+        cv2.waitKey(5) 
+
+        if len(self.filtered_detections.xyxy) == 1:
+            x = 1/2*(self.filtered_detections.xyxy[0][0] + self.filtered_detections.xyxy[0][2]) - 1280/2
+            return dict(error=str(x))
 
 
 if __name__ == "__main__":
     cap = Inference().start()
     while True:
-        cap.read_plot()
+        print(cap.read_plot())
         # cv2.imshow('frame', frame)
         # cv2.waitKey(1)

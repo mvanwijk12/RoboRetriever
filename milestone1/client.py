@@ -6,6 +6,7 @@ import traceback
 import libclient
 import numpy as np
 import time
+from inference import Inference
 
 class ConnectionClient:
     def __init__(self, hostname='127.0.0.1', port=65432):
@@ -43,7 +44,7 @@ class ConnectionClient:
         message = libclient.Message(self.sock, (self.host, self.port), request)
         
         try:
-            # This will send all the 
+            # This will send all the None
             message.write()
 
         except (socket.error, ConnectionResetError) as e:
@@ -72,31 +73,10 @@ class ConnectionClient:
 
 if __name__ == "__main__":
     con = ConnectionClient(hostname='robo-retriever.local')
-    # cap = Inference().start()
+    res = Inference().start()
     while True:
-        detections = dict(
-                    xyxy=np.array([[1006.654, 653.64, 1038.28, 684.96]]).tolist(),
-                    confidence=np.array([0.89]).tolist(),
-                    class_id=np.array([32]).tolist(),
-                    tracker_id=np.array([3]).tolist(),
-                    data={'class_name': np.array(['sports ball'], dtype='<U13').tolist()}
-                )
-                
+        detections = res.read_plot()
         con.send_detections(detections)
         time.sleep(0.5)
 
 
-# detections = dict(
-#                 xyxy=np.array([[1006.654, 653.64, 1038.28, 684.96]]).tolist(),
-#                 confidence=np.array([0.89]).tolist(),
-#                 class_id=np.array([32]).tolist(),
-#                 tracker_id=np.array([3]).tolist(),
-#                 data={'class_name': np.array(['sports ball'], dtype='<U13').tolist()}
-# )
-# detections = dict(
-#                 xyxy=np.array([[]]).tolist(),
-#                 confidence=np.array([]).tolist(),
-#                 class_id=np.array([]).tolist(),
-#                 tracker_id=np.array([]).tolist(),
-#                 data=None
-# )

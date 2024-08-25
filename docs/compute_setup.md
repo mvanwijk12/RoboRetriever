@@ -22,6 +22,11 @@
     `python client.py` <br />
     Note a internet connection is required the first time this script is run as `ultralytics` will attempt to install some remaining packages. This script will try to access a server on the raspberry pi and a camera stream from the raspberry pi, both of these services need to be running on the pi for `client.py` to execute without errors. For initial testing purposes, the ConnectionClient can be commented/omitted and just the Inference left running, if the installation is successful a image window should appear and update every 0.5s with bounding boxes around any detected tennis balls.
 
+## Miscellaneous Notes
+To delete a Conda environment,  <br />
+`conda deactivate`  <br />
+`conda remove -n ENV_NAME --all`
+
 ## Bug Fixes (THIS HAS NOT BEEN REPRODUCIBLE!)
 For some reason I was getting an error from opencv that `cv2.imshow() is not implemented`. Changing the package manager to conda seemed to fix this issue.
 

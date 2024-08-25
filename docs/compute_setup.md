@@ -7,7 +7,7 @@
    `conda activate RoboRetriever`
 4. Check the python version is 3.12
    `python --version`
-6. Install gstreamer and gstreamer plugins (Ref. https://l.messenger.com/l.php?u=https%3A%2F%2Fstackoverflow.com%2Fquestions%2F73167161%2Ferror-when-trying-to-capture-some-frames-from-a-video-using-open-cv-on-windows&h=AT1L4-CJlgf2nRAigbISdQwqzcugNJKHqjx9FOT7N_6-JLrPcQ-P0EmoRz1szRCdz1GAudkbQ0jjHgUF2hYFcqqUr8Ih-50FSuy64s-Qs4JKBToQByGmlXjBoISLtsKsrEeqPA)
+6. Install gstreamer and gstreamer plugins (Ref. https://stackoverflow.com/questions/73167161/error-when-trying-to-capture-some-frames-from-a-video-using-open-cv-on-windows)
    `conda install gst-plugins-base gst-plugins-good gstreamer`
 7. Install pip in the newly created conda environment (this maybe already installed)
   `conda install pip`
@@ -27,7 +27,7 @@
 To delete a Conda environment,  <br />
 `conda deactivate`  <br />
 `conda remove -n ENV_NAME --all`  <br />
-(Ref. https://l.messenger.com/l.php?u=https%3A%2F%2Fstackoverflow.com%2Fquestions%2F49127834%2Fremoving-conda-environment&h=AT1L4-CJlgf2nRAigbISdQwqzcugNJKHqjx9FOT7N_6-JLrPcQ-P0EmoRz1szRCdz1GAudkbQ0jjHgUF2hYFcqqUr8Ih-50FSuy64s-Qs4JKBToQByGmlXjBoISLtsKsrEeqPA)
+(Ref. https://stackoverflow.com/questions/49127834/removing-conda-environment)
 
 ## Bug Fixes (THIS HAS NOT BEEN REPRODUCIBLE!)
 For some reason I was getting an error from opencv that `cv2.imshow() is not implemented`. Changing the package manager to conda seemed to fix this issue.

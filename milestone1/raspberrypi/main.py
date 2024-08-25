@@ -8,7 +8,7 @@ from server import ConnectionServer
 
 # Constants
 LIMIT_SWITCH_PIN = 10
-TIMEOUT = 20
+TIMEOUT = 30
 
 class RobotController:
     #robot = Drive()
@@ -61,8 +61,9 @@ class RobotController:
                     robot.set_1D_direction(dirForward=True)
                     for current_actionLR in self.stored_pathway:
                     # run through all the steps we took backwards, setting our left wheel as right and right as left.
-                        robot.drive(speed=0.05, leftwheel_multilpier=current_actionLR[1], rightwheel_multiplier=current_actionLR[0])
-                    break
+                        robot.drive(speed=0.05, leftwheel_multilpier=current_actionLR[0], rightwheel_multiplier=current_actionLR[1])
+                    robot.pi.hardware_PWM(robot.stepL, 0, 500000)
+                    robot.pi.hardware_PWM(robot.stepR, 0, 500000)
                 else:
                     self.lwheel, self.rwheel = controller.homing_multiplier(PIDout)
                     # save the multiplier for bth wheels together, used for reversing

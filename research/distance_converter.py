@@ -9,7 +9,7 @@ import math
 def distance_converter(x1, x2):
     horizontal_res = 1280
     fov = 102 # From camera datasheet
-    diameter = 66.75 # Middle of standard range
+    diameter = 0.0667 # Middle of standard range
 
     x_diff = abs(x2 - x1)
     angle_diff = x_diff * fov / horizontal_res # Represents angle from centre of ball to edge

@@ -51,7 +51,7 @@ class Drive:
             GPIO.output(self.dirL, GPIO.LOW)
             GPIO.output(self.dirR, GPIO.HIGH)
 
-    def drive(self, distance=2, speed=1, leftwheel_multilpier=1.0, rightwheel_multiplier=1.0):
+    def drive(self, distance=0.2, speed=0.05, leftwheel_multilpier=1.0, rightwheel_multiplier=1.0):
         """ Function to start driving a specified distance in metres """
         req_revolutions = distance/(self.traction_factor * self.wheel_circumference)
         # print(f'#revolutions {req_revolutions}')
@@ -61,7 +61,7 @@ class Drive:
         req_revs_per_sec = speed/(self.traction_factor * self.wheel_circumference)
         # print(f'req_revs_per_sec {req_revs_per_sec}')
         req_steps_per_sec = req_revs_per_sec * self.steps_per_rev * (1/self.stepping_mode) # PWM freq
-        # print(f'pwm freq = {int(req_steps_per_sec)}')
+        #print(f'pwm freq = {int(req_steps_per_sec)}')
 
         # steering
         left_steps_per_sec = req_steps_per_sec * leftwheel_multilpier
@@ -70,7 +70,7 @@ class Drive:
         drive_time = req_steps/(req_steps_per_sec)
         # print(f'Required steps {req_steps}')
         # print(f'Required revs per second {req_revs_per_sec}')
-        # print(f'Drive time {drive_time}s')
+        print(f'Drive time {drive_time}s')
 
         # self.setup_timer("Timer 1", drive_time, self.timer_function) 
         
@@ -79,6 +79,19 @@ class Drive:
         self.pi.hardware_PWM(self.stepR, int(right_steps_per_sec), 500000)
         while time.time() - self.start_time < drive_time:
             pass
+        # now drive slower for a bit
+        self.pi.hardware_PWM(self.stepL, int(req_steps_per_sec/2), 500000)
+        self.pi.hardware_PWM(self.stepR, int(req_steps_per_sec/2), 500000)
+        self.start_time = time.time()
+        while time.time() - self.start_time < 0.2:
+            pass
+        # even slower
+        self.pi.hardware_PWM(self.stepL, int(req_steps_per_sec/4), 500000)
+        self.pi.hardware_PWM(self.stepR, int(req_steps_per_sec/4), 500000)
+        self.start_time = time.time()
+        while time.time() - self.start_time < 0.2:
+            pass
+        # stop
         self.pi.hardware_PWM(self.stepL, 0, 500000)
         self.pi.hardware_PWM(self.stepR, 0, 500000)
 
@@ -111,8 +124,9 @@ if __name__ == "__main__":
             print('left wheel ', round(lwheel,2), ', right wheel ', round(rwheel,2))
             
             robot.set_1D_direction(dirForward=False)
-            robot.drive(distance=0.2, speed=0.2, leftwheel_multilpier=lwheel, rightwheel_multiplier=rwheel)
-
+            robot.drive(distance=0.4, speed=0.2, leftwheel_multilpier=lwheel, rightwheel_multiplier=rwheel)
+            
+            #robot.drive(distance=1, speed=0.1, leftwheel_multilpier=0.5, rightwheel_multiplier=0.5)
             # while True:
             #     pass
 

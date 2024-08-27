@@ -1,6 +1,6 @@
 import socket
 import io
-import picamera
+import picamera2
 
 # Configuration
 FRAMERATE = 30
@@ -10,7 +10,7 @@ TCP_IP = '0.0.0.0'
 TCP_PORT = 8554
 
 def start_stream():
-    with picamera.PiCamera() as camera:
+    with picamera2.Picamera2() as camera:
         # Configure the camera
         camera.resolution = (WIDTH, HEIGHT)
         camera.framerate = FRAMERATE
@@ -30,7 +30,7 @@ def start_stream():
             connection, client_address = server_socket.accept()
             connection = connection.makefile('wb')
             try:
-                camera.start_recording(connection, format='h264')
+                camera.start_recording(connection, 'h264')
                 camera.wait_recording(0)  # Run indefinitely
             except KeyboardInterrupt:
                 print("Stream interrupted, stopping...")

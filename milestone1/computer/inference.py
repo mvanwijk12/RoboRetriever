@@ -11,6 +11,7 @@ import supervision as sv
 import camerastream as cs
 import numpy as np
 import cv2
+import time
 
 class Inference:
     def __init__(self, src='tcp://robo-retriever.local:8554', model_path='../../models/yolov8n.pt', frame_h=720, frame_w=1280):
@@ -23,6 +24,11 @@ class Inference:
         self.model = YOLO(model_path)
         self.desired_class_ids = [key for key, value in self.model.names.items() if value == 'sports ball']
         self.img_frame = None
+        self.num_counter_above_threshold = 0 # counts the number of detections within distance_threshold
+        self.start_time_above_threshold = 0 # records the start time of the first detection within distance_threshold
+        self.num_counter_critial_value = 3 # robot stops once num_counter_above_threshold == num_counter_critial_value
+        self.distance_threshold = 10e-2 # in metres
+        self.time_threshold = 10 # in seconds
 
     def start(self):
         Thread(target=self.process_image_update, args=()).start()
@@ -100,7 +106,45 @@ class Inference:
 
         if len(self.filtered_detections.xyxy) == 1:
             x = 1/2*(self.filtered_detections.xyxy[0][0] + self.filtered_detections.xyxy[0][2]) - 1280/2
-            return dict(error=str(x))
+            dist = self.estimate_distance(self.filtered_detections.xyxy[0])
+            
+            if dist < self.distance_threshold:
+                print('Tennis ball detected within distance threshold')
+                current_time = time.time()
+                if (current_time - self.start_time_above_threshold < self.time_threshold):
+                    # update num detections
+                    self.num_counter_above_threshold += 1
+                    print(f'#Detection Counter Incremented {self.num_counter_above_threshold}')
+                else:
+                    self.start_time_above_threshold = current_time
+                    self.num_counter_above_threshold = 1
+                    print('#Detection Counter Reset')
+
+                if self.num_counter_above_threshold == self.num_counter_critial_value:
+                    print('Stop condition reached!')
+                    return dict(error=str(x), stop='True')
+                
+            return dict(error=str(x), stop='False')
+        
+
+    def estimate_distance(self, bbox, focal_pixel=520, real_world_diameter=67e-3):
+        """
+        Estimate the distance of the tennis ball from the camera.
+
+        Parameters:
+        - bbox: tuple or list (x1, y1, x2, y2) of the bounding box coordinates.
+        - focal_length: float, the focal length of the camera in pixels.
+        - real_world_diameter: float, the real-world diameter of the tennis ball in cm.
+
+        Returns:
+        - distance: float, estimated distance to the tennis ball in cm.
+        """
+        # Extract bounding box width and height
+        x1, y1, x2, y2 = bbox
+        bbox_width = abs(x2 - x1)
+
+        # Calculate distance using the formula: Distance = (Real Diameter * Focal Length) / Perceived Diameter
+        return (real_world_diameter * focal_pixel) / bbox_width
 
 
 if __name__ == "__main__":

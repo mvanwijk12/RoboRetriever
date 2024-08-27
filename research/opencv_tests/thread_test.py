@@ -22,7 +22,8 @@ def camera_capture():
 def display_thread_1():
     while not stop_event.is_set():
         if frame is not None:
-            print(detect_line(frame, True))
+            connected_lines, [triggered, angle, distance] = detect_line(frame, True)
+            print(connected_lines)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 stop_event.set()

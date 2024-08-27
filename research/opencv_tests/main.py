@@ -413,6 +413,13 @@ if __name__ == "__main__":
             cv2.imshow('Detected Lines', image)
 
             print("\n#####################")
+
+            # Provide output if the trigger box is crossed
+            if trigger[0]:
+                print(f"Trigger Box Crossed! Angle: {trigger[1]:.2f} degrees, Distance: {trigger[2]:.2f} px")
+            else:
+                print("No crossing detected.")
+        
             #print("   x1  y1  x2  y2")
             #print(lines_list)
             

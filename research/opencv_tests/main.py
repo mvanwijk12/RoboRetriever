@@ -151,7 +151,7 @@ def translate_points(circles):
     for circle in real_world_circles:
         print(f"Center: {circle['center']}, Real-world radius: {circle['radius']} meters")
 
-def detect_line(frame):
+def detect_line(frame, show_img=False):
     # convert to greyscale
     grey_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -275,9 +275,10 @@ def detect_line(frame):
 
     # display image
     combined_image = cv2.addWeighted(frame, 0.5, line_image, 1, 0)
-    cv2.imshow('Detected Lines', combined_image)
+    if show_img:
+        cv2.imshow('Detected Lines', combined_image)
 
-    return connected_lines, [triggered, angle, distance]
+    return connected_lines, [triggered, angle, distance], combined_image
 
 if __name__ == "__main__":
     # Settings adjustment GUI
@@ -389,7 +390,8 @@ if __name__ == "__main__":
             draw_text(screen, image_file_names[current_image_index], (100, 680), size=25)
 
             if slider_values_changed:
-                lines_list, trigger = detect_line(frame)
+                lines_list, trigger, image = detect_line(frame)
+                cv2.imshow('Detected Lines', image)
                 slider_values_changed = False
 
                 print("\n#####################")
@@ -407,7 +409,8 @@ if __name__ == "__main__":
             ret, frame = cap.read()
             if not ret:
                 break
-            lines_list, trigger = detect_line(frame)
+            lines_list, trigger, image = detect_line(frame)
+            cv2.imshow('Detected Lines', image)
 
             print("\n#####################")
             #print("   x1  y1  x2  y2")

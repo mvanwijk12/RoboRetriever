@@ -1,5 +1,6 @@
 import cv2
 import threading
+from main import detect_line
 
 # Global variable to store the current frame
 frame = None
@@ -21,7 +22,8 @@ def camera_capture():
 def display_thread_1():
     while not stop_event.is_set():
         if frame is not None:
-            cv2.imshow("Thread 1", frame)
+            print(detect_line(frame, True))
+
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 stop_event.set()
 

@@ -51,7 +51,7 @@ class Drive:
             GPIO.output(self.dirL, GPIO.LOW)
             GPIO.output(self.dirR, GPIO.HIGH)
 
-    def drive(self, distance=2, speed=1, leftwheel_multilpier=1.0, rightwheel_multiplier=1.0):
+    def drive(self, distance=0.2, speed=0.05, leftwheel_multilpier=1.0, rightwheel_multiplier=1.0):
         """ Function to start driving a specified distance in metres """
         req_revolutions = distance/(self.traction_factor * self.wheel_circumference)
         # print(f'#revolutions {req_revolutions}')

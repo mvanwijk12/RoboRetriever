@@ -5,10 +5,12 @@ import numpy as np
 import cv2
 
 # Load a model
-model = YOLO("yolov8s.pt")  # load an official detection model
+# model = YOLO("yolov8s.pt")  # load an official detection model
+model = YOLO("../../models/yolov8s.pt")  # load an official detection model
+
 
 # Track with the model
-result = model.track(source="test_img.jpeg")[0]
+result = model.track(source="../../img/test_img.jpeg")[0]
 desired_class_ids = [32]
 
 # Convert to sv detection object
@@ -45,4 +47,4 @@ annotated_image = box_annotator.annotate(scene=img_frame.copy(), detections=filt
 # plt.show()
 
 cv2.imshow('frame', annotated_image)
-cv2.waitKey(1)
+cv2.waitKey(2000)

@@ -31,7 +31,7 @@ class Drive:
         self.stepR = stepR
         self.dirL = dirL
         self.dirR = dirR
-        self.wheel_circumference = 55e-3 * math.pi # measured wheel diameter 55mm
+        self.wheel_circumference = 95e-3 * math.pi # measured wheel diameter 55mm
         self.traction_factor = 0.9
         self.steps_per_rev = 200
         self.stepping_mode = 1/8 # Assume 1/8 stepping
@@ -80,8 +80,8 @@ class Drive:
         while time.time() - self.start_time < drive_time:
             pass
         # now drive slower for a bit
-        self.pi.hardware_PWM(self.stepL, int(req_steps_per_sec/2), 500000)
         self.pi.hardware_PWM(self.stepR, int(req_steps_per_sec/2), 500000)
+        self.pi.hardware_PWM(self.stepL, int(req_steps_per_sec/2), 500000)
         self.start_time = time.time()
         while time.time() - self.start_time < 0.2:
             pass

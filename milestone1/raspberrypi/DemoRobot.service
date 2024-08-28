@@ -1,10 +1,10 @@
 [Unit]
-Description=Camera Stream over TCP
+Description=Robot controller service
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/bin/bash /home/pi/rpi_tcp_stream.sh
+ExecStart=/usr/bin/python /home/pi/RoboRetriever/milestone1/raspberrypi/main.py
 Restart=always
 RestartSec=5
 

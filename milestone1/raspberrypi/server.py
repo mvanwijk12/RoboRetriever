@@ -64,10 +64,9 @@ class ConnectionServer:
     def get_message(self):
         try:
             success = False
-            while not success:
-                if not self.msg_ready:
-                    with self.condition:
-                        success = self.condition.wait(timeout=1)
+            while not success and not self.msg_ready:
+                with self.condition:
+                    success = self.condition.wait(timeout=1)
         except KeyboardInterrupt:
             self.close()
             server_logger.info('Caught keyboard interrupt, closing..')

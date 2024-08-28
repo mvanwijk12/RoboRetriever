@@ -60,13 +60,16 @@ class ConnectionClient:
                     # Try to reconnect
                     self.logger.error(f"Error: {e}. Attempting to reconnect...")
                     sock.close()
-                    time.sleep(3)  # Wait before reconnecting
+
+                    start_time = time.time()
+                    while time.time() - start_time < 3: # Wait before reconnecting
+                        pass  
 
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     self.sock.setblocking(False)
                     self.sock.connect_ex((self.host, self.port))
                     self.logger.info("Reconnected to server.")
-                    request.write()
+                    message.write()
 
                 except Exception as e:
                     self.logger.error(f"Attempt {i + 1}/{self.MAX_RECONNECTION_ATTEMPTS} Failed to reconnect: {e}")
@@ -84,8 +87,8 @@ if __name__ == "__main__":
     # create self.logger
     logging.config.fileConfig('log.conf')
     logger = logging.getLogger(__name__)
-    con = ConnectionClient(hostname='raspberry.local')
-    res = Inference(src='tcp://raspberry.local:8554').start()
+    con = ConnectionClient(hostname='robo-retriever.local')
+    res = Inference(src='tcp://robo-retriever.local:8554').start()
     while True:
         detections = res.read_plot()
         con.send_detections(detections)

@@ -5,6 +5,12 @@ import time
 from drive import Drive
 from Pcontrol import Controller
 from server import ConnectionServer
+import logging
+import logging.config
+
+# create logger
+logging.config.fileConfig('log.conf')
+main_logger = logging.getLogger('main')
 
 # Constants
 LIMIT_SWITCH_PIN = 10
@@ -41,15 +47,15 @@ class RobotController:
             try:
                 x = self.con.get_message()
                 if x is None:
-                    print("no ball detected, driving straight")
+                    main_logger.info("no ball detected, driving straight")
                     robot.set_1D_direction(dirForward=False)
                     PIDout = 0.0
                     # speed = 0.08
                 else:
                     pixel_error = x["error"]
                     self.stop = x["stop"]
-                    print(f"self.stop = {self.stop} and type(self.stop) = {type(self.stop)}")
-                    print("ball detected, control initiated...")
+                    main_logger.info(f"self.stop = {self.stop} and type(self.stop) = {type(self.stop)}")
+                    main_logger.info("ball detected, control initiated...")
                     # run PID with ball position error to make an adjustment
                     PIDout = controller.PID(float(pixel_error))
                     # if -20 <= PIDout <= 20:
@@ -58,15 +64,15 @@ class RobotController:
                     #     speed = 0.05
                 # drive with control if we got a package from pc
                 if PIDout is None:
-                    print("error, didn't fetch from pc and skipped ahead")
+                    main_logger.error("error, didn't fetch from pc and skipped ahead")
                 elif self.stop=='True':
-                    print("stop commanded, arrived at ball")
+                    main_logger.info("stop commanded, arrived at ball")
                     #drive backwards, retrace our steps
                     robot.set_1D_direction(dirForward=True)
                     for current_actionLR in self.stored_pathway:
                     # run through all the steps we took backwards, setting our left wheel as right and right as left.
                         robot.drive(distance=0.2, speed=0.1, leftwheel_multilpier=current_actionLR[0], rightwheel_multiplier=current_actionLR[1])
-                        print('backwards: left wheel ', round(current_actionLR[0],2), ', right wheel ', round(current_actionLR[1],2))
+                        main_logger.info('backwards: left wheel ', round(current_actionLR[0],2), ', right wheel ', round(current_actionLR[1],2))
                     robot.pi.hardware_PWM(robot.stepL, 0, 500000)
                     robot.pi.hardware_PWM(robot.stepR, 0, 500000)
                     break
@@ -76,7 +82,7 @@ class RobotController:
                     both_wheelsLR = [self.lwheel, self.rwheel]
                     self.stored_pathway.append(both_wheelsLR)
                     #print("stored path so far:", self.stored_pathway)
-                    print('forwards: left wheel ', round(self.lwheel,2), ', right wheel ', round(self.rwheel,2))
+                    main_logger.info('forwards: left wheel ', round(self.lwheel,2), ', right wheel ', round(self.rwheel,2))
                     robot.set_1D_direction(dirForward=False)
                     robot.drive(distance=0.2, speed=0.1, leftwheel_multilpier=self.lwheel, rightwheel_multiplier=self.rwheel) 
                 
@@ -93,7 +99,7 @@ class RobotController:
         try:
             self.main_loop()
         finally:
-            print('system ended')
+            main_logger.info('system ended')
             # self.cleanup()
 
 if __name__ == "__main__":

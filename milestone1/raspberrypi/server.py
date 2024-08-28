@@ -73,6 +73,7 @@ class ConnectionServer:
             server_logger.info('Caught keyboard interrupt, closing..')
             raise KeyboardInterrupt('Closing down server...')
         else:
+            server_logger.debug('new msg received')
             self.msg_ready = False 
             return self.msg
 

@@ -72,7 +72,7 @@ class RobotController:
                     for current_actionLR in self.stored_pathway:
                     # run through all the steps we took backwards, setting our left wheel as right and right as left.
                         robot.drive(distance=0.2, speed=0.1, leftwheel_multilpier=current_actionLR[0], rightwheel_multiplier=current_actionLR[1])
-                        main_logger.info('backwards: left wheel ', round(current_actionLR[0],2), ', right wheel ', round(current_actionLR[1],2))
+                        main_logger.info(f'backwards: left wheel {round(current_actionLR[0],2)} right wheel {round(current_actionLR[1],2)}')
                     robot.pi.hardware_PWM(robot.stepL, 0, 500000)
                     robot.pi.hardware_PWM(robot.stepR, 0, 500000)
                     break
@@ -82,7 +82,7 @@ class RobotController:
                     both_wheelsLR = [self.lwheel, self.rwheel]
                     self.stored_pathway.append(both_wheelsLR)
                     #print("stored path so far:", self.stored_pathway)
-                    main_logger.info('forwards: left wheel ', round(self.lwheel,2), ', right wheel ', round(self.rwheel,2))
+                    main_logger.info(f'forwards: left wheel {round(self.lwheel,2)} right wheel {round(self.rwheel,2)}')
                     robot.set_1D_direction(dirForward=False)
                     robot.drive(distance=0.2, speed=0.1, leftwheel_multilpier=self.lwheel, rightwheel_multiplier=self.rwheel) 
                 

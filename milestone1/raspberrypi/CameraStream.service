@@ -1,0 +1,12 @@
+[Unit]
+Description=Camera Stream over TCP
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/bin/bash /home/e21/RoboRetriever/milestone1/raspberrypi/rpi_tcp_stream.sh
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

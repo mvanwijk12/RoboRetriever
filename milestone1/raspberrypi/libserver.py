@@ -114,7 +114,7 @@ class Message:
         if self.jsonheader["content-type"] == "text/json":
             encoding = self.jsonheader["content-encoding"]
             request = self._json_decode(data, encoding)
-            self.logger.debug(f"Received request {self.request!r} from {self.addr}")
+            self.logger.debug(f"Received request {request!r} from {self.addr}")
             
             # Setup for next read
             self._jsonheader_len = None

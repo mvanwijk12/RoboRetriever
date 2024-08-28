@@ -73,7 +73,22 @@ class Drive:
         right_steps_per_sec = req_steps_per_sec  * rightwheel_multiplier
         
         drive_time = req_steps/(req_steps_per_sec)
- 
+
+        # ramp up driving from stop
+        self.logger.debug(f'quarter original speed for 0.2s')
+        self.pi.hardware_PWM(self.stepR, int(req_steps_per_sec/4), 500000)
+        self.pi.hardware_PWM(self.stepL, int(req_steps_per_sec/4), 500000)
+        self.start_time = time.time()
+        while time.time() - self.start_time < 0.2:
+            pass
+
+        # bit faster
+        self.logger.debug(f'half original speed for 0.2s')
+        self.pi.hardware_PWM(self.stepL, int(req_steps_per_sec/2), 500000)
+        self.pi.hardware_PWM(self.stepR, int(req_steps_per_sec/2), 500000)
+        self.start_time = time.time()
+        while time.time() - self.start_time < 0.2:
+            pass
         # Start driving at desired speed
         self.logger.info(f'Drive time at desired speed: {drive_time}s')        
         self.start_time = time.time()
@@ -100,11 +115,45 @@ class Drive:
        
         # stop
         self.all_stop()
+
+    def tank_turn(self, direction=1, amount=0.1, speed=0.05):
+        req_revolutions = amount/(self.traction_factor * self.wheel_diameter)
+        req_steps = req_revolutions * self.steps_per_rev * (1/self.stepping_mode)
+        self.logger.debug(f'#Required steps: {req_steps}')
         
+        req_revs_per_sec = speed/(self.traction_factor * self.wheel_diameter)
+        self.logger.debug(f'Required revs per sec: {req_revs_per_sec}')
+
+        req_steps_per_sec = req_revs_per_sec * self.steps_per_rev * (1/self.stepping_mode) # PWM freq
+        self.logger.debug(f'PWM frequency: {int(req_steps_per_sec)}')
+
+        drive_time = req_steps/(req_steps_per_sec)
+        
+        # turn right (clockwise)
+        if direction == 1:
+            GPIO.output(self.dirL, GPIO.HIGH)
+            GPIO.output(self.dirR, GPIO.HIGH)
+
+        else:
+            GPIO.output(self.dirL, GPIO.LOW)
+            GPIO.output(self.dirR, GPIO.LOW)
+        # Steering
+        left_steps_per_sec = req_steps_per_sec
+        right_steps_per_sec = req_steps_per_sec
+        self.start_time = time.time()
+        self.pi.hardware_PWM(self.stepL, int(left_steps_per_sec), 500000)
+        self.pi.hardware_PWM(self.stepR, int(right_steps_per_sec), 500000)
+        while time.time() - self.start_time < drive_time:
+            pass
+        # stop
+        self.all_stop()
+
+
+
     def all_stop(self):
         self.logger.debug(f'Stopping')
-        self.pi.hardware_PWM(self.stepL, 0, 500000)
         self.pi.hardware_PWM(self.stepR, 0, 500000)
+        self.pi.hardware_PWM(self.stepL, 0, 500000)
 
    
 if __name__ == "__main__":
@@ -123,7 +172,6 @@ if __name__ == "__main__":
             robot.set_1D_direction(dirForward=False)
             robot.drive(distance=0.4, speed=0.2, leftwheel_multilpier=lwheel, rightwheel_multiplier=rwheel)
             
-            #robot.drive(distance=1, speed=0.1, leftwheel_multilpier=0.5, rightwheel_multiplier=0.5)
             # while True:
             #     pass
 

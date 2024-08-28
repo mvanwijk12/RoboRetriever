@@ -16,10 +16,6 @@ from Pcontrol import Controller
 import logging
 import logging.config
 
-# create logger
-logging.config.fileConfig('log.conf')
-drive_logger = logging.getLogger('drive')
-
 class Drive:
     """ Represents a robot drive object """
     def __init__(self, stepL=18, stepR=19, dirL=24, dirR=23):
@@ -40,6 +36,7 @@ class Drive:
         self.stepping_mode = 1/8 # Assume 1/8 stepping
         self.pi = pigpio.pi()
         self.start_time = None
+        self.logger = logging.getLogger(__name__)
 
         # This may raise warnings about GPIO being set already, ignore
         GPIO.setmode(GPIO.BCM)
@@ -51,25 +48,25 @@ class Drive:
         if dirForward:
             GPIO.output(self.dirL, GPIO.HIGH)
             GPIO.output(self.dirR, GPIO.LOW)
-            drive_logger.info("Setting drive direction as forward")
+            self.logger.info("Setting drive direction as forward")
         else:
             GPIO.output(self.dirL, GPIO.LOW)
             GPIO.output(self.dirR, GPIO.HIGH)
-            drive_logger.info("Setting drive direction as backwards")
+            self.logger.info("Setting drive direction as backwards")
 
     def drive(self, distance=0.2, speed=0.05, leftwheel_multilpier=1.0, rightwheel_multiplier=1.0):
         """ Function to start driving a specified distance in metres """
         req_revolutions = distance/(self.traction_factor * self.wheel_diameter)
-        drive_logger.debug(f'#Revolutions: {req_revolutions}')
+        self.logger.debug(f'#Revolutions: {req_revolutions}')
 
         req_steps = req_revolutions * self.steps_per_rev * (1/self.stepping_mode)
-        drive_logger.debug(f'#Required steps: {req_steps}')
+        self.logger.debug(f'#Required steps: {req_steps}')
         
         req_revs_per_sec = speed/(self.traction_factor * self.wheel_diameter)
-        drive_logger.debug(f'Required revs per sec: {req_revs_per_sec}')
+        self.logger.debug(f'Required revs per sec: {req_revs_per_sec}')
 
         req_steps_per_sec = req_revs_per_sec * self.steps_per_rev * (1/self.stepping_mode) # PWM freq
-        drive_logger.debug(f'PWM frequency: {int(req_steps_per_sec)}')
+        self.logger.debug(f'PWM frequency: {int(req_steps_per_sec)}')
 
         # Steering
         left_steps_per_sec = req_steps_per_sec * leftwheel_multilpier
@@ -78,7 +75,7 @@ class Drive:
         drive_time = req_steps/(req_steps_per_sec)
  
         # Start driving at desired speed
-        drive_logger.info(f'Drive time at desired speed: {drive_time}s')        
+        self.logger.info(f'Drive time at desired speed: {drive_time}s')        
         self.start_time = time.time()
         self.pi.hardware_PWM(self.stepL, int(left_steps_per_sec), 500000)
         self.pi.hardware_PWM(self.stepR, int(right_steps_per_sec), 500000)
@@ -86,7 +83,7 @@ class Drive:
             pass
 
         # Now drive slower for a bit
-        drive_logger.debug(f'Half original speed for 0.2s')
+        self.logger.debug(f'Half original speed for 0.2s')
         self.pi.hardware_PWM(self.stepR, int(req_steps_per_sec/2), 500000)
         self.pi.hardware_PWM(self.stepL, int(req_steps_per_sec/2), 500000)
         self.start_time = time.time()
@@ -94,7 +91,7 @@ class Drive:
             pass
 
         # even slower
-        drive_logger.debug(f'Quarter original speed for 0.2s')
+        self.logger.debug(f'Quarter original speed for 0.2s')
         self.pi.hardware_PWM(self.stepL, int(req_steps_per_sec/4), 500000)
         self.pi.hardware_PWM(self.stepR, int(req_steps_per_sec/4), 500000)
         self.start_time = time.time()
@@ -105,12 +102,14 @@ class Drive:
         self.all_stop()
         
     def all_stop(self):
-        drive_logger.debug(f'Stopping')
+        self.logger.debug(f'Stopping')
         self.pi.hardware_PWM(self.stepL, 0, 500000)
         self.pi.hardware_PWM(self.stepR, 0, 500000)
 
    
 if __name__ == "__main__":
+   logging.config.fileConfig('log.conf')
+   logger = logging.getLogger(__name__)
    robot = Drive()
    while True: 
         try:

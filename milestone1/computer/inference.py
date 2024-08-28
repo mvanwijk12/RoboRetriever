@@ -13,10 +13,7 @@ import numpy as np
 import cv2
 import time
 import logging
-import logging.config
 
-# Get logger
-logger = logging.getLogger(__name__)
 
 class Inference:
     def __init__(self, src='tcp://robo-retriever.local:8554', model_path='../../models/yolov8m.pt', frame_h=720, frame_w=1280):
@@ -34,6 +31,7 @@ class Inference:
         self.num_counter_critial_value = 3 # robot stops once num_counter_above_threshold == num_counter_critial_value
         self.distance_threshold = 40e-2 # in metres
         self.time_threshold = 120 # in seconds
+        self.logger = logging.getLogger(__name__)
 
     def start(self):
         Thread(target=self.process_image_update, args=()).start()
@@ -112,25 +110,25 @@ class Inference:
         if len(self.filtered_detections.xyxy) == 1:
             x = 1/2*(self.filtered_detections.xyxy[0][0] + self.filtered_detections.xyxy[0][2]) - 1280/2
             dist = self.estimate_distance(self.filtered_detections.xyxy[0])
-            logger.info(f'distance is {dist}')
+            self.logger.info(f'distance is {dist}')
 
             if dist < self.distance_threshold:
-                logger.debug('Tennis ball detected within distance threshold')
+                self.logger.debug('Tennis ball detected within distance threshold')
 
                 # Check detections are close by in time
                 current_time = time.time()
                 if (current_time - self.start_time_above_threshold < self.time_threshold):
                     # update num detections
                     self.num_counter_above_threshold += 1
-                    logger.debug(f'#Detection Counter Incremented {self.num_counter_above_threshold}')
+                    self.logger.debug(f'#Detection Counter Incremented {self.num_counter_above_threshold}')
                 else:
                     self.start_time_above_threshold = current_time
                     self.num_counter_above_threshold = 1
-                    logger.debug('#Detection Counter Reset')
+                    self.logger.debug('#Detection Counter Reset')
 
                 # Check stop condition
                 if self.num_counter_above_threshold >= self.num_counter_critial_value:
-                    logger.info('Stop condition reached! Tennis ball detected!')
+                    self.logger.info('Stop condition reached! Tennis ball detected!')
                     return dict(error=str(x), stop='True')
                 
             return dict(error=str(x), stop='False')
@@ -157,6 +155,8 @@ class Inference:
 
 
 if __name__ == "__main__":
+    logging.config.fileConfig('log.conf')
+    logger = logging.getLogger(__name__)
     cap = Inference().start()
     while True:
-        logger.debug(cap.read_plot())
+        cap.logger.debug(cap.read_plot())

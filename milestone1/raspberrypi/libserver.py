@@ -13,10 +13,6 @@ import struct
 import logging
 import logging.config
 
-# create logger
-logging.config.fileConfig('log.conf')
-libserver_logger = logging.getLogger('libserver')
-
 class Message:
     def __init__(self, selector, sock, addr):
         self.selector = selector
@@ -26,6 +22,7 @@ class Message:
         self._jsonheader_len = None
         self.jsonheader = None
         self.request = None
+        self.logger = logging.getLogger(__name__)
 
     def _read(self):
         try:
@@ -67,11 +64,11 @@ class Message:
                 return self.process_request()
 
     def close(self):
-        libserver_logger.info(f"Closing connection to {self.addr}")
+        self.logger.info(f"Closing connection to {self.addr}")
         try:
             self.selector.unregister(self.sock)
         except Exception as e:
-            libserver_logger.error(
+            self.logger.error(
                 f"Error: selector.unregister() exception for "
                 f"{self.addr}: {e!r}"
             )
@@ -79,7 +76,7 @@ class Message:
         try:
             self.sock.close()
         except OSError as e:
-            libserver_logger.error(f"Error: socket.close() exception for {self.addr}: {e!r}")
+            self.logger.error(f"Error: socket.close() exception for {self.addr}: {e!r}")
         finally:
             # Delete reference to socket object for garbage collection
             self.sock = None
@@ -117,7 +114,7 @@ class Message:
         if self.jsonheader["content-type"] == "text/json":
             encoding = self.jsonheader["content-encoding"]
             request = self._json_decode(data, encoding)
-            libserver_logger.debug(f"Received request {self.request!r} from {self.addr}")
+            self.logger.debug(f"Received request {self.request!r} from {self.addr}")
             
             # Setup for next read
             self._jsonheader_len = None
@@ -126,7 +123,7 @@ class Message:
         else:
             # Binary or unknown content-type
             self.request = data
-            libserver_logger.debug(
+            self.logger.debug(
                 f"Received {self.jsonheader['content-type']} "
                 f"request from {self.addr}"
             )

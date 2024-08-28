@@ -12,10 +12,7 @@ import time
 from inference import Inference
 import logging
 import logging.config
-
-# create logger
-logging.config.fileConfig('log.conf')
-logger = logging.getLogger(__name__)
+import sys
 
 class ConnectionClient:
     MAX_RECONNECTION_ATTEMPTS = 10
@@ -24,16 +21,17 @@ class ConnectionClient:
         self.port = port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setblocking(False)
-        logger.info(f"Starting connection to {(self.host, self.port)}")
+        self.logger = logging.getLogger(__name__)
+        self.logger.info(f"Starting connection to {(self.host, self.port)}")
         self.sock.connect_ex((self.host, self.port))
 
     def close(self):
         ''' Closes the connection '''
-        logger.info(f"Closing connection to {(self.host, self.port)}")
+        self.logger.info(f"Closing connection to {(self.host, self.port)}")
         try:
             self.sock.close()
         except OSError as e:
-            logger.error(f"Error: socket.close() exception for {(self.host, self.port)}: {e!r}")
+            self.logger.error(f"Error: socket.close() exception for {(self.host, self.port)}: {e!r}")
         finally:
             # Delete reference to socket object for garbage collection
             self.sock = None
@@ -56,34 +54,38 @@ class ConnectionClient:
             # This will send all the None
             message.write()
 
-        except (socket.error, ConnectionResetError, UnboundLocalError) as e:
+        except Exception as e:
             for i in range(self.MAX_RECONNECTION_ATTEMPTS):
                 try:
                     # Try to reconnect
-                    logger.error(f"Error: {e}. Attempting to reconnect...")
+                    self.logger.error(f"Error: {e}. Attempting to reconnect...")
                     sock.close()
                     time.sleep(3)  # Wait before reconnecting
 
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     self.sock.setblocking(False)
                     self.sock.connect_ex((self.host, self.port))
-                    logger.info("Reconnected to server.")
+                    self.logger.info("Reconnected to server.")
                     request.write()
 
-                except (socket.error, ConnectionResetError, UnboundLocalError) as e:
-                    logger.error(f"Attempt {i + 1}/{self.MAX_RECONNECTION_ATTEMPTS} Failed to reconnect: {e}")
+                except Exception as e:
+                    self.logger.error(f"Attempt {i + 1}/{self.MAX_RECONNECTION_ATTEMPTS} Failed to reconnect: {e}")
                     
                 else:
                     break
             else:
-                logger.error('Max reconnection attempts reached. Exiting...')
-                raise Exception('Could not reconnect')
+                self.logger.error('Max reconnection attempts reached. Exiting...')
+                self.close()
+                sys.exit()
 
         
 
 if __name__ == "__main__":
-    con = ConnectionClient(hostname='robo-retriever.local')
-    res = Inference().start()
+    # create self.logger
+    logging.config.fileConfig('log.conf')
+    logger = logging.getLogger(__name__)
+    con = ConnectionClient(hostname='raspberry.local')
+    res = Inference(src='tcp://raspberry.local:8554').start()
     while True:
         detections = res.read_plot()
         con.send_detections(detections)

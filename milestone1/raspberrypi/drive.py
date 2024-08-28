@@ -79,22 +79,25 @@ class Drive:
         self.pi.hardware_PWM(self.stepR, int(right_steps_per_sec), 500000)
         while time.time() - self.start_time < drive_time:
             pass
+        print(f'drive time elaspsed')
         # now drive slower for a bit
         self.pi.hardware_PWM(self.stepR, int(req_steps_per_sec/2), 500000)
         self.pi.hardware_PWM(self.stepL, int(req_steps_per_sec/2), 500000)
         self.start_time = time.time()
         while time.time() - self.start_time < 0.2:
             pass
+        print(f'decel1')
         # even slower
         self.pi.hardware_PWM(self.stepL, int(req_steps_per_sec/4), 500000)
         self.pi.hardware_PWM(self.stepR, int(req_steps_per_sec/4), 500000)
         self.start_time = time.time()
         while time.time() - self.start_time < 0.2:
             pass
+        print(f'decel2')
         # stop
         self.pi.hardware_PWM(self.stepL, 0, 500000)
         self.pi.hardware_PWM(self.stepR, 0, 500000)
-
+        print(f'exiting')
 
     # def setup_timer(self, name, duration_seconds, function):
     #     """Sets up a timer to execute a function after a certain duration."""

@@ -1,4 +1,10 @@
-#!/usr/bin/env python3
+"""
+This is a python class for creating a server
+
+Modified from: https://realpython.com/python-sockets/ 
+"""
+__author__ = "Matt van Wijk"
+__date__ = "28/08/2024"
 
 import selectors
 import socket
@@ -67,10 +73,10 @@ class ConnectionServer:
             while not success and not self.msg_ready:
                 with self.condition:
                     success = self.condition.wait(timeout=1)
-        except KeyboardInterrupt:
+        except: # catch all exceptions including KeyboardInterrupt
+            server_logger.error(f"Main: Error: Exception for {traceback.format_exc()}")
             self.close()
-            server_logger.info('Caught keyboard interrupt, closing..')
-            raise KeyboardInterrupt('Closing down server...')
+            raise Exception
         else:
             server_logger.debug('new msg received')
             self.msg_ready = False 

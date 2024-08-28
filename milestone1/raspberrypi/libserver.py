@@ -1,3 +1,11 @@
+"""
+This is a python class for creating a message object to send over a network.
+
+Modified from: https://realpython.com/python-sockets/ 
+"""
+__author__ = "Matt van Wijk"
+__date__ = "28/08/2024"
+
 import io
 import json
 import selectors

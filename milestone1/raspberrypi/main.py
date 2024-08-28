@@ -86,14 +86,11 @@ class RobotController:
                     robot.set_1D_direction(dirForward=False)
                     robot.drive(distance=0.2, speed=0.1, leftwheel_multilpier=self.lwheel, rightwheel_multiplier=self.rwheel) 
                 
-            except KeyboardInterrupt:
-            # terminate gracefully
-                robot.pi.hardware_PWM(robot.stepL, 0, 500000)
-                robot.pi.hardware_PWM(robot.stepR, 0, 500000)
-                raise KeyboardInterrupt('Motors turned off - closing ...')
-                #GPIO.cleanup()
-                #sys.exit()
-
+            except: # catch all exceptions including KeyboardInterrupt
+                # terminate gracefully
+                robot.all_stop()
+                self.con.close()
+                raise Exception('Motors turned off - closing ...')
 
     def run(self):
         try:

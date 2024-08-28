@@ -84,6 +84,7 @@ class RobotController:
             # terminate gracefully
                 robot.pi.hardware_PWM(robot.stepL, 0, 500000)
                 robot.pi.hardware_PWM(robot.stepR, 0, 500000)
+                raise KeyboardInterrupt('Motors turned off - closing ...')
                 #GPIO.cleanup()
                 #sys.exit()
 

@@ -15,9 +15,8 @@ import time
 import logging
 import logging.config
 
-# create logger
-logging.config.fileConfig('log.conf')
-inference_logger = logging.getLogger('inference')
+# Get logger
+logger = logging.getLogger(__name__)
 
 class Inference:
     def __init__(self, src='tcp://robo-retriever.local:8554', model_path='../../models/yolov8m.pt', frame_h=720, frame_w=1280):
@@ -113,25 +112,25 @@ class Inference:
         if len(self.filtered_detections.xyxy) == 1:
             x = 1/2*(self.filtered_detections.xyxy[0][0] + self.filtered_detections.xyxy[0][2]) - 1280/2
             dist = self.estimate_distance(self.filtered_detections.xyxy[0])
-            inference_logger.info(f'distance is {dist}')
+            logger.info(f'distance is {dist}')
 
             if dist < self.distance_threshold:
-                inference_logger.debug('Tennis ball detected within distance threshold')
+                logger.debug('Tennis ball detected within distance threshold')
 
                 # Check detections are close by in time
                 current_time = time.time()
                 if (current_time - self.start_time_above_threshold < self.time_threshold):
                     # update num detections
                     self.num_counter_above_threshold += 1
-                    inference_logger.debug(f'#Detection Counter Incremented {self.num_counter_above_threshold}')
+                    logger.debug(f'#Detection Counter Incremented {self.num_counter_above_threshold}')
                 else:
                     self.start_time_above_threshold = current_time
                     self.num_counter_above_threshold = 1
-                    inference_logger.debug('#Detection Counter Reset')
+                    logger.debug('#Detection Counter Reset')
 
                 # Check stop condition
                 if self.num_counter_above_threshold >= self.num_counter_critial_value:
-                    inference_logger.info('Stop condition reached! Tennis ball detected!')
+                    logger.info('Stop condition reached! Tennis ball detected!')
                     return dict(error=str(x), stop='True')
                 
             return dict(error=str(x), stop='False')
@@ -160,4 +159,4 @@ class Inference:
 if __name__ == "__main__":
     cap = Inference().start()
     while True:
-        inference_logger.debug(cap.read_plot())
+        logger.debug(cap.read_plot())

@@ -15,7 +15,7 @@ import logging.config
 
 # create logger
 logging.config.fileConfig('log.conf')
-client_logger = logging.getLogger('client')
+logger = logging.getLogger(__name__)
 
 class ConnectionClient:
     MAX_RECONNECTION_ATTEMPTS = 10
@@ -24,16 +24,16 @@ class ConnectionClient:
         self.port = port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setblocking(False)
-        client_logger.info(f"Starting connection to {(self.host, self.port)}")
+        logger.info(f"Starting connection to {(self.host, self.port)}")
         self.sock.connect_ex((self.host, self.port))
 
     def close(self):
         ''' Closes the connection '''
-        client_logger.info(f"Closing connection to {(self.host, self.port)}")
+        logger.info(f"Closing connection to {(self.host, self.port)}")
         try:
             self.sock.close()
         except OSError as e:
-            client_logger.error(f"Error: socket.close() exception for {(self.host, self.port)}: {e!r}")
+            logger.error(f"Error: socket.close() exception for {(self.host, self.port)}: {e!r}")
         finally:
             # Delete reference to socket object for garbage collection
             self.sock = None
@@ -60,23 +60,24 @@ class ConnectionClient:
             for i in range(self.MAX_RECONNECTION_ATTEMPTS):
                 try:
                     # Try to reconnect
-                    client_logger.error(f"Error: {e}. Attempting to reconnect...")
+                    logger.error(f"Error: {e}. Attempting to reconnect...")
                     sock.close()
                     time.sleep(3)  # Wait before reconnecting
 
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     self.sock.setblocking(False)
                     self.sock.connect_ex((self.host, self.port))
-                    client_logger.info("Reconnected to server.")
+                    logger.info("Reconnected to server.")
                     request.write()
 
-                except (socket.error, ConnectionResetError) as e:
-                    client_logger.error(f"Attempt {i + 1}/{self.MAX_RECONNECTION_ATTEMPTS} Failed to reconnect: {e}")
+                except (socket.error, ConnectionResetError, UnboundLocalError) as e:
+                    logger.error(f"Attempt {i + 1}/{self.MAX_RECONNECTION_ATTEMPTS} Failed to reconnect: {e}")
                     
                 else:
                     break
             else:
-                client_logger.error('Max reconnection attempts reached. Exiting...')
+                logger.error('Max reconnection attempts reached. Exiting...')
+                raise Exception('Could not reconnect')
 
         
 

@@ -106,8 +106,8 @@ class Drive:
         
     def all_stop(self):
         drive_logger.debug(f'Stopping')
-        self.pi.hardware_PWM(robot.stepL, 0, 500000)
-        self.pi.hardware_PWM(robot.stepR, 0, 500000)
+        self.pi.hardware_PWM(self.stepL, 0, 500000)
+        self.pi.hardware_PWM(self.stepR, 0, 500000)
 
    
 if __name__ == "__main__":

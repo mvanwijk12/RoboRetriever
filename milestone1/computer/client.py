@@ -56,7 +56,7 @@ class ConnectionClient:
             # This will send all the None
             message.write()
 
-        except (socket.error, ConnectionResetError) as e:
+        except (socket.error, ConnectionResetError, UnboundLocalError) as e:
             for i in range(self.MAX_RECONNECTION_ATTEMPTS):
                 try:
                     # Try to reconnect

@@ -1,26 +1,37 @@
-#!/usr/bin/env python3
+"""
+This is a python class for creating a client
+
+Modified from: https://realpython.com/python-sockets/ 
+"""
+__author__ = "Matt van Wijk"
+__date__ = "28/08/2024"
+
 import socket
 import libclient
 import time
 from inference import Inference
+import logging
+import logging.config
+import sys
 
 class ConnectionClient:
-    def __init__(self, hostname='127.0.0.1', port=65432):
+    MAX_RECONNECTION_ATTEMPTS = 10
+    def __init__(self, hostname='robo-retriever.local', port=65432):
         self.host = hostname
         self.port = port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setblocking(False)
-        print(f"Starting connection to {(self.host, self.port)}")
+        self.logger = logging.getLogger(__name__)
+        self.logger.info(f"Starting connection to {(self.host, self.port)}")
         self.sock.connect_ex((self.host, self.port))
-        self.MAX_RECONNECTION = 10
 
     def close(self):
         ''' Closes the connection '''
-        print(f"Closing connection to {(self.host, self.port)}")
+        self.logger.info(f"Closing connection to {(self.host, self.port)}")
         try:
             self.sock.close()
         except OSError as e:
-            print(f"Error: socket.close() exception for {(self.host, self.port)}: {e!r}")
+            self.logger.error(f"Error: socket.close() exception for {(self.host, self.port)}: {e!r}")
         finally:
             # Delete reference to socket object for garbage collection
             self.sock = None
@@ -43,33 +54,41 @@ class ConnectionClient:
             # This will send all the None
             message.write()
 
-        except (socket.error, ConnectionResetError) as e:
-            for i in range(self.MAX_RECONNECTION):
+        except Exception as e:
+            for i in range(self.MAX_RECONNECTION_ATTEMPTS):
                 try:
                     # Try to reconnect
-                    print(f"Error: {e}. Attempting to reconnect...")
+                    self.logger.error(f"Error: {e}. Attempting to reconnect...")
                     sock.close()
-                    time.sleep(3)  # Wait before reconnecting
+
+                    start_time = time.time()
+                    while time.time() - start_time < 3: # Wait before reconnecting
+                        pass  
 
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     self.sock.setblocking(False)
                     self.sock.connect_ex((self.host, self.port))
-                    print("Reconnected to server.")
-                    request.write()
+                    self.logger.info("Reconnected to server.")
+                    message.write()
 
-                except (socket.error, ConnectionResetError) as e:
-                    print(f"Attempt {i + 1}/{self.MAX_RECONNECTION} Failed to reconnect: {e}")
+                except Exception as e:
+                    self.logger.error(f"Attempt {i + 1}/{self.MAX_RECONNECTION_ATTEMPTS} Failed to reconnect: {e}")
                     
                 else:
                     break
             else:
-                print('Max reconnection attempts reached. Exiting...')
+                self.logger.error('Max reconnection attempts reached. Exiting...')
+                self.close()
+                sys.exit()
 
         
 
 if __name__ == "__main__":
+    # create self.logger
+    logging.config.fileConfig('log.conf')
+    logger = logging.getLogger(__name__)
     con = ConnectionClient(hostname='robo-retriever.local')
-    res = Inference().start()
+    res = Inference(src='tcp://robo-retriever.local:8554').start()
     while True:
         detections = res.read_plot()
         con.send_detections(detections)

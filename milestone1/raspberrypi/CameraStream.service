@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/bin/bash /home/pi/rpi_tcp_stream.sh
+ExecStart=/bin/bash /home/e21/RoboRetriever/milestone1/raspberrypi/rpi_tcp_stream.sh
 Restart=always
 RestartSec=2
 

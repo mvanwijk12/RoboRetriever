@@ -22,13 +22,13 @@ def camera_capture():
 def display_thread_1():
     while not stop_event.is_set():
         if frame is not None:
-            connected_lines, trigger, image = detect_line(frame)
+            trigger, connected_lines, image = detect_line(frame)
             cv2.imshow('Thread 1: Detected Lines', image)
 
             if trigger[0]:
-                print("Trigger Box Crossed! Vector:", trigger[3])
+                print(trigger[3])
             else:
-                print("No crossing detected.")
+                print(None)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 stop_event.set()
@@ -51,9 +51,9 @@ thread_2 = threading.Thread(target=display_thread_2)
 thread_1.start()
 thread_2.start()
 
-# Wait for all threads to finish
-capture_thread.join()
-thread_1.join()
-thread_2.join()
+# # Wait for all threads to finish
+# capture_thread.join()
+# thread_1.join()
+# thread_2.join()
 
 cv2.destroyAllWindows()

@@ -221,7 +221,7 @@ def detect_line(frame, show_img=False):
     triggered = False
     angle = None
     distance = None
-    line_vector = [0,0]
+    line_vector = np.array([0,0])
     if connected_lines is not None:
         for line in connected_lines:
             x1, y1, x2, y2 = line[0]
@@ -276,7 +276,7 @@ def detect_line(frame, show_img=False):
                 vec_a = y2 - y1
                 vec_b = x1 - x2
                 vec_c = vec_a * x1 + vec_b * y1
-                line_vector = [vec_a,vec_b]
+                line_vector = np.array([vec_a,vec_b])
 
                 break  # Exit loop once a crossing line is found
 
@@ -285,7 +285,7 @@ def detect_line(frame, show_img=False):
     if show_img:
         cv2.imshow('Detected Lines', combined_image)
 
-    return connected_lines, [triggered, angle, distance, line_vector], combined_image
+    return [triggered, angle, distance, line_vector], connected_lines, combined_image
 
 if __name__ == "__main__":
     # Settings adjustment GUI
@@ -397,7 +397,7 @@ if __name__ == "__main__":
             draw_text(screen, image_file_names[current_image_index], (100, 680), size=25)
 
             if slider_values_changed:
-                lines_list, trigger, image = detect_line(frame)
+                trigger, lines_list, image = detect_line(frame)
                 cv2.imshow('Detected Lines', image)
                 slider_values_changed = False
 
@@ -417,7 +417,7 @@ if __name__ == "__main__":
             ret, frame = cap.read()
             if not ret:
                 break
-            lines_list, trigger, image = detect_line(frame)
+            trigger, lines_list, image = detect_line(frame)
             cv2.imshow('Detected Lines', image)
 
             print("\n#####################")

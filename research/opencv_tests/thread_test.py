@@ -22,8 +22,13 @@ def camera_capture():
 def display_thread_1():
     while not stop_event.is_set():
         if frame is not None:
-            connected_lines, [triggered, angle, distance] = detect_line(frame, True)
-            print(connected_lines)
+            connected_lines, trigger, image = detect_line(frame)
+            cv2.imshow('Thread 1: Detected Lines', image)
+
+            if trigger[0]:
+                print("Trigger Box Crossed! Vector:", trigger[3])
+            else:
+                print("No crossing detected.")
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 stop_event.set()
@@ -31,7 +36,7 @@ def display_thread_1():
 def display_thread_2():
     while not stop_event.is_set():
         if frame is not None:
-            cv2.imshow("Thread 2", frame)
+            cv2.imshow("Thread 2: Ball Detection (WIP)", frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 stop_event.set()
 

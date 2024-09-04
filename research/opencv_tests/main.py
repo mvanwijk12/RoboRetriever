@@ -17,10 +17,10 @@ TRIGGER_OFFSET = 0.2
 
 image_mode_selected = True
 folder = "court_lines/"
-image_file_names = ['20240820_124438.jpg','20240820_124447.jpg','20240820_124451.jpg','20240820_124509.jpg','20240820_124511.jpg','20240820_124521.jpg',
-                    '20240820_124524.jpg','20240820_124535.jpg','20240820_124539.jpg','20240820_124551.jpg','20240820_124554.jpg','20240820_124603.jpg',
-                    '20240820_124612.jpg','20240820_124619.jpg','20240820_124626.jpg','20240820_124701.jpg','20240820_124708.jpg','20240820_124732.jpg',
-                    '20240820_124734.jpg','20240820_124745.jpg','20240820_124802.jpg','20240820_124804.jpg','20240820_124806.jpg','20240820_124808.jpg',
+image_file_names = ['20240820_124734.jpg','20240820_124438.jpg','20240820_124447.jpg','20240820_124451.jpg','20240820_124509.jpg','20240820_124511.jpg',
+                    '20240820_124521.jpg','20240820_124524.jpg','20240820_124535.jpg','20240820_124539.jpg','20240820_124551.jpg','20240820_124554.jpg',
+                    '20240820_124603.jpg','20240820_124612.jpg','20240820_124619.jpg','20240820_124626.jpg','20240820_124701.jpg','20240820_124708.jpg',
+                    '20240820_124732.jpg','20240820_124745.jpg','20240820_124802.jpg','20240820_124804.jpg','20240820_124806.jpg','20240820_124808.jpg',
                     '20240820_124810.jpg','20240820_124820.jpg','20240820_124821.jpg','20240820_124826.jpg','20240820_124827.jpg','20240820_124831.jpg',
                     '20240820_124833.jpg','20240820_124835.jpg','20240820_124838.jpg']
 current_image_index = 0
@@ -221,6 +221,7 @@ def detect_line(frame, show_img=False):
     triggered = False
     angle = None
     distance = None
+    line_vector = [0,0]
     if connected_lines is not None:
         for line in connected_lines:
             x1, y1, x2, y2 = line[0]
@@ -237,7 +238,7 @@ def detect_line(frame, show_img=False):
                 """ Find the intersection of two lines (p1-p2) and (q1-q2). """
                 s1_x, s1_y = p2[0] - p1[0], p2[1] - p1[1]
                 s2_x, s2_y = q2[0] - q1[0], q2[1] - q1[1]
-                
+
                 s = (-s1_y * (p1[0] - q1[0]) + s1_x * (p1[1] - q1[1])) / (-s2_x * s1_y + s1_x * s2_y)
                 t = ( s2_x * (p1[1] - q1[1]) - s2_y * (p1[0] - q1[0])) / (-s2_x * s1_y + s1_x * s2_y)
 
@@ -271,6 +272,12 @@ def detect_line(frame, show_img=False):
                 # Calculate the distance form the box center to the midpoint
                 distance = np.sqrt((midpoint_x - box_center[0])**2 + (midpoint_y - box_center[1])**2)
 
+                # Calculate the vector (ax+by=c into [a,b]) of the line
+                vec_a = y2 - y1
+                vec_b = x1 - x2
+                vec_c = vec_a * x1 + vec_b * y1
+                line_vector = [vec_a,vec_b]
+
                 break  # Exit loop once a crossing line is found
 
     # display image
@@ -278,7 +285,7 @@ def detect_line(frame, show_img=False):
     if show_img:
         cv2.imshow('Detected Lines', combined_image)
 
-    return connected_lines, [triggered, angle, distance], combined_image
+    return connected_lines, [triggered, angle, distance, line_vector], combined_image
 
 if __name__ == "__main__":
     # Settings adjustment GUI
@@ -399,6 +406,7 @@ if __name__ == "__main__":
                 # Provide output if the trigger box is crossed
                 if trigger[0]:
                     print(f"Trigger Box Crossed! Angle: {trigger[1]:.2f} degrees, Distance: {trigger[2]:.2f} px")
+                    print(trigger[3])
                 else:
                     print("No crossing detected.")
 
@@ -417,6 +425,7 @@ if __name__ == "__main__":
             # Provide output if the trigger box is crossed
             if trigger[0]:
                 print(f"Trigger Box Crossed! Angle: {trigger[1]:.2f} degrees, Distance: {trigger[2]:.2f} px")
+                print(trigger[3])
             else:
                 print("No crossing detected.")
         

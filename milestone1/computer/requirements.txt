@@ -1,3 +1,4 @@
 opencv-python==4.10.0.84
 ultralytics==8.2.79
 supervision==0.22.0
+pygame==2.6.0

@@ -10,6 +10,8 @@ import socket
 import libclient
 import time
 from inference import Inference
+import camerastream as cs
+from tragectory import Tragectory
 import logging
 import logging.config
 import sys
@@ -88,8 +90,11 @@ if __name__ == "__main__":
     logging.config.fileConfig('log.conf')
     logger = logging.getLogger(__name__)
     con = ConnectionClient(hostname='robo-retriever.local')
-    res = Inference(src='tcp://robo-retriever.local:8554').start()
+    cs_stream = cs.CameraStream().start()
+    res = Inference(cs_stream).start()
+    trag = Tragectory(cs_stream).start()
     while True:
+        trag.read_reflect_trag()
         detections = res.read_plot()
         con.send_detections(detections)
         time.sleep(0.5)

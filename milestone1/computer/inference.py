@@ -18,13 +18,14 @@ from copy import deepcopy
 
 
 class Inference:
-    def __init__(self, src='tcp://robo-retriever.local:8554', model_path='../../models/yolov10m.pt', frame_h=720, frame_w=1280):
+    def __init__(self, cs_stream, model_path='../../models/yolov8m.pt', frame_h=720, frame_w=1280):
         """ Initialises the camera stream object """
         self.stopped = False
         self.has_new = False
+        # self.stream = cs.CameraStream(src=src, frame_h=frame_h, frame_w=frame_w).start()
+        self.stream = cs_stream
         self.frame_h = frame_h
         self.frame_w = frame_w
-        self.stream = cs.CameraStream(src=src, frame_h=frame_h, frame_w=frame_w).start()
         self.condition = Condition()
         self.frame = None
         self.model = YOLO(model_path)

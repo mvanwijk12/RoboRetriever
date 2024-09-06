@@ -3,6 +3,8 @@ import socket
 import libclient
 import time
 from inference import Inference
+import camerastream as cs
+from tragectory import Tragectory
 
 class ConnectionClient:
     def __init__(self, hostname='127.0.0.1', port=65432):
@@ -69,8 +71,11 @@ class ConnectionClient:
 
 if __name__ == "__main__":
     con = ConnectionClient(hostname='robo-retriever.local')
-    res = Inference().start()
+    cs_stream = cs.CameraStream().start()
+    res = Inference(cs_stream).start()
+    trag = Tragectory(cs_stream).start()
     while True:
+        trag.read_reflect_trag()
         detections = res.read_plot()
         con.send_detections(detections)
         time.sleep(0.5)

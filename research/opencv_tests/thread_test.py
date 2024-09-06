@@ -1,6 +1,6 @@
 import cv2
 import threading
-from main import detect_line
+from milestone1.computer.linedetection import detect_line
 
 # Global variable to store the current frame
 frame = None

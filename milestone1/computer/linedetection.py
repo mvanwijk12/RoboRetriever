@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import pygame
+import logging
 from scipy.interpolate import griddata
 
 # Variables
@@ -16,7 +17,7 @@ TRIGGER_SIZE = 0.5
 TRIGGER_OFFSET = 0.2
 
 image_mode_selected = True
-folder = "court_lines/"
+folder = "../../research/opencv_tests/court_lines/"
 image_file_names = ['20240820_124734.jpg','20240820_124438.jpg','20240820_124447.jpg','20240820_124451.jpg','20240820_124509.jpg','20240820_124511.jpg',
                     '20240820_124521.jpg','20240820_124524.jpg','20240820_124535.jpg','20240820_124539.jpg','20240820_124551.jpg','20240820_124554.jpg',
                     '20240820_124603.jpg','20240820_124612.jpg','20240820_124619.jpg','20240820_124626.jpg','20240820_124701.jpg','20240820_124708.jpg',
@@ -30,6 +31,8 @@ BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 LIGHT_GREY = (200, 200, 200)
 BLUE = (0, 0, 255)
+
+logger = logging.getLogger(__name__)
 
 class Slider:
     def __init__(self, x, y, w, min_val, max_val, start_val, step=1):
@@ -152,27 +155,57 @@ def translate_points(circles):
         print(f"Center: {circle['center']}, Real-world radius: {circle['radius']} meters")
 
 def detect_line(frame, show_img=False):
-    # convert to greyscale
-    grey_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    try:
+        # Convert to greyscale
+        grey_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        logger.info('Converted frame to greyscale')
+    except Exception as e:
+        logger.error(f'Error converting frame to greyscale: {e}')
+        return None, None, None
 
-    # apply gaussian blur
-    blurred = cv2.GaussianBlur(grey_image, (5, 5), 0)
+    try:
+        # Apply Gaussian blur
+        blurred = cv2.GaussianBlur(grey_image, (5, 5), 0)
+        logger.info('Applied Gaussian blur')
+    except Exception as e:
+        logger.error(f'Error applying Gaussian blur: {e}')
+        return None, None, None
 
-    # adaptive thresholding for different shades of white of lines
-    adaptive_thresh = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+    try:
+        # Adaptive thresholding
+        adaptive_thresh = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+        logger.info('Applied adaptive thresholding')
+    except Exception as e:
+        logger.error(f'Error applying adaptive thresholding: {e}')
+        return None, None, None
+
+    try:
+        # Morphological operations
+        kernel = np.ones((3, 3), np.uint8)
+        dilated = cv2.dilate(adaptive_thresh, kernel, iterations=1)
+        eroded = cv2.erode(dilated, kernel, iterations=1)
+        logger.info('Applied dilation and erosion to close tiny line gaps')
+    except Exception as e:
+        logger.error(f'Error applying morphological operations: {e}')
+        return None, None, None
+
+    try:
+        # Edge detection
+        edges = cv2.Canny(eroded, CANNY_T_LOW, CANNY_T_HIGH, apertureSize=CANNY_APERTURE)
+        logger.info(f'Performed Canny edge detection with a threshold from {CANNY_T_LOW} to {CANNY_T_HIGH}, with an aperture of {CANNY_APERTURE}')
+    except Exception as e:
+        logger.error(f'Error performing Canny edge detection: {e}')
+        return None, None, None
+
+    try:
+        # Hough line transform
+        lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=HOUGH_THRESHOLD, minLineLength=HOUGH_LINE_LENGTH_MIN, maxLineGap=HOUGH_LINE_GAP_MAX)
+        logger.info(f'Detected lines using the Hough line transform with a threshold of {HOUGH_THRESHOLD}, a minimum line length of {HOUGH_LINE_LENGTH_MIN} and maximum line gap of {HOUGH_LINE_GAP_MAX}')
+    except Exception as e:
+        logger.error(f'Error performing Hough line transform: {e}')
+        return None, None, None
     
-    # morphological operations to close gaps in lines
-    kernel = np.ones((3, 3), np.uint8)
-    dilated = cv2.dilate(adaptive_thresh, kernel, iterations=1)
-    eroded = cv2.erode(dilated, kernel, iterations=1)
-
-    # edge detection
-    edges = cv2.Canny(eroded, CANNY_T_LOW, CANNY_T_HIGH, apertureSize=CANNY_APERTURE)
-
-    # Hough line transform
-    lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=HOUGH_THRESHOLD, minLineLength=HOUGH_LINE_LENGTH_MIN, maxLineGap=HOUGH_LINE_GAP_MAX)
-
-    # draw lines
+    # draw lines - initialise variable
     line_image = np.zeros_like(frame)
 
     # Function to connect line segments that are close and aligned
@@ -195,97 +228,120 @@ def detect_line(frame, show_img=False):
                         new_lines.append(line2)
         
         return np.array(new_lines)
-    
-    # Connect broken line segments
-    connected_lines = connect_lines(lines)
-    
+
+    try:
+        # Connect broken line segments
+        connected_lines = connect_lines(lines)
+        logger.info('Ran line connection function to close larger line gaps')
+    except Exception as e:
+        logger.error(f'Error connecting lines: {e}')
+        return None, None, None
+
     if connected_lines is not None:
-        for line in connected_lines:
-            x1, y1, x2, y2 = line[0]
-            cv2.line(line_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        try:
+            line_image = np.zeros_like(frame)
+            for line in connected_lines:
+                x1, y1, x2, y2 = line[0]
+                cv2.line(line_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            logger.info('Drawn lines onto frame image')
+        except Exception as e:
+            logger.error(f'Error drawing lines on frame: {e}')
+            return None, None, None
 
-    # Define the trigger box (center of the image with a given size)
-    height, width = frame.shape[:2]
-    height_offset = int(height * TRIGGER_OFFSET)
-    box_center = (width // 2, height // 2 + height_offset)
-    box_size = int(min(width, height) * TRIGGER_SIZE)
-    box_x1 = box_center[0] - box_size // 2
-    box_y1 = box_center[1] - box_size // 2
-    box_x2 = box_center[0] + box_size // 2
-    box_y2 = box_center[1] + box_size // 2
+    try:
+        # Define and draw the trigger box
+        height, width = frame.shape[:2]
+        height_offset = int(height * TRIGGER_OFFSET)
+        box_center = (width // 2, height // 2 + height_offset)
+        box_size = int(min(width, height) * TRIGGER_SIZE)
+        box_x1 = box_center[0] - box_size // 2
+        box_y1 = box_center[1] - box_size // 2
+        box_x2 = box_center[0] + box_size // 2
+        box_y2 = box_center[1] + box_size // 2
 
-    # Draw the trigger box on the image
-    cv2.rectangle(line_image, (box_x1, box_y1), (box_x2, box_y2), RED, 2)
+        cv2.rectangle(line_image, (box_x1, box_y1), (box_x2, box_y2), RED, 2)
+        logger.info('Created trigger box')
+    except Exception as e:
+        logger.error(f'Error creating trigger box: {e}')
+        return None, None, None
 
-    # Check if any line crosses the trigger box
-    triggered = False
-    angle = None
-    distance = None
-    line_vector = np.array([0,0])
-    if connected_lines is not None:
-        for line in connected_lines:
-            x1, y1, x2, y2 = line[0]
+    try:
+        # Check if any line crosses the trigger box
+        triggered = False
+        angle = None
+        distance = None
+        line_vector = np.array([0, 0])
 
-            # Check for intersection with the trigger box boundaries
-            intersections = []
-            if box_x1 <= x1 <= box_x2 and box_y1 <= y1 <= box_y2:
-                intersections.append((x1, y1))
-            if box_x1 <= x2 <= box_x2 and box_y1 <= y2 <= box_y2:
-                intersections.append((x2, y2))
-            
-            # Calculate intersection with the box edges if endpoints are outside
-            def line_intersection(p1, p2, q1, q2):
-                """ Find the intersection of two lines (p1-p2) and (q1-q2). """
-                s1_x, s1_y = p2[0] - p1[0], p2[1] - p1[1]
-                s2_x, s2_y = q2[0] - q1[0], q2[1] - q1[1]
+        if connected_lines is not None:
+            for line in connected_lines:
+                x1, y1, x2, y2 = line[0]
 
-                s = (-s1_y * (p1[0] - q1[0]) + s1_x * (p1[1] - q1[1])) / (-s2_x * s1_y + s1_x * s2_y)
-                t = ( s2_x * (p1[1] - q1[1]) - s2_y * (p1[0] - q1[0])) / (-s2_x * s1_y + s1_x * s2_y)
-
-                if 0 <= s <= 1 and 0 <= t <= 1:
-                    int_x = p1[0] + (t * s1_x)
-                    int_y = p1[1] + (t * s1_y)
-                    return int(int_x), int(int_y)
-                return None
-
-            # Check intersection with each box edge
-            box_edges = [((box_x1, box_y1), (box_x2, box_y1)),
-                         ((box_x2, box_y1), (box_x2, box_y2)),
-                         ((box_x2, box_y2), (box_x1, box_y2)),
-                         ((box_x1, box_y2), (box_x1, box_y1))]
-
-            for edge in box_edges:
-                intersection = line_intersection((x1, y1), (x2, y2), edge[0], edge[1])
-                if intersection is not None:
-                    intersections.append(intersection)
-
-            # If we have two intersections, the line crosses the box
-            if len(intersections) == 2:
-                triggered = True
-                midpoint_x = (intersections[0][0] + intersections[1][0]) // 2
-                midpoint_y = (intersections[0][1] + intersections[1][1]) // 2
+                # Check for intersection with the trigger box boundaries
+                intersections = []
+                if box_x1 <= x1 <= box_x2 and box_y1 <= y1 <= box_y2:
+                    intersections.append((x1, y1))
+                if box_x1 <= x2 <= box_x2 and box_y1 <= y2 <= box_y2:
+                    intersections.append((x2, y2))
                 
-                # Calculate the angle from the box center to the midpoint
-                angle = np.arctan2(midpoint_y - box_center[1], midpoint_x - box_center[0]) * 180 / np.pi
-                angle = (angle + 450) % 360 # convert to 0 to 360 instead of -180 to 180
+                # Calculate intersection with the box edges if endpoints are outside
+                def line_intersection(p1, p2, q1, q2):
+                    """ Find the intersection of two lines (p1-p2) and (q1-q2). """
+                    s1_x, s1_y = p2[0] - p1[0], p2[1] - p1[1]
+                    s2_x, s2_y = q2[0] - q1[0], q2[1] - q1[1]
 
-                # Calculate the distance form the box center to the midpoint
-                distance = np.sqrt((midpoint_x - box_center[0])**2 + (midpoint_y - box_center[1])**2)
+                    s = (-s1_y * (p1[0] - q1[0]) + s1_x * (p1[1] - q1[1])) / (-s2_x * s1_y + s1_x * s2_y)
+                    t = ( s2_x * (p1[1] - q1[1]) - s2_y * (p1[0] - q1[0])) / (-s2_x * s1_y + s1_x * s2_y)
 
-                # Calculate the vector (ax+by=c into [a,b]) of the line
-                vec_a = y2 - y1
-                vec_b = x1 - x2
-                vec_c = vec_a * x1 + vec_b * y1
-                line_vector = np.array([vec_a,vec_b])
+                    if 0 <= s <= 1 and 0 <= t <= 1:
+                        int_x = p1[0] + (t * s1_x)
+                        int_y = p1[1] + (t * s1_y)
+                        return int(int_x), int(int_y)
+                    return None
 
-                break  # Exit loop once a crossing line is found
+                # Check intersection with each box edge
+                box_edges = [((box_x1, box_y1), (box_x2, box_y1)),
+                            ((box_x2, box_y1), (box_x2, box_y2)),
+                            ((box_x2, box_y2), (box_x1, box_y2)),
+                            ((box_x1, box_y2), (box_x1, box_y1))]
 
-    # display image
-    combined_image = cv2.addWeighted(frame, 0.5, line_image, 1, 0)
-    if show_img:
-        cv2.imshow('Detected Lines', combined_image)
+                for edge in box_edges:
+                    intersection = line_intersection((x1, y1), (x2, y2), edge[0], edge[1])
+                    if intersection is not None:
+                        intersections.append(intersection)
+
+                # If we have two intersections, the line crosses the box
+                if len(intersections) == 2:
+                    triggered = True
+                    midpoint_x = (intersections[0][0] + intersections[1][0]) // 2
+                    midpoint_y = (intersections[0][1] + intersections[1][1]) // 2
+                    
+                    # Calculate angle and distance
+                    angle = np.arctan2(midpoint_y - box_center[1], midpoint_x - box_center[0]) * 180 / np.pi
+                    angle = (angle + 450) % 360  # convert to 0 to 360 instead of -180 to 180
+
+                    distance = np.sqrt((midpoint_x - box_center[0])**2 + (midpoint_y - box_center[1])**2)
+
+                    vec_a = y2 - y1
+                    vec_b = x1 - x2
+                    vec_c = vec_a * x1 + vec_b * y1
+                    line_vector = np.array([vec_a, vec_b])
+
+                    break  # Exit loop once a crossing line is found
+    except Exception as e:
+        logger.error(f'Error checking for line crossing the trigger box: {e}')
+        return None, None, None
+
+    try:
+        # Display the image
+        combined_image = cv2.addWeighted(frame, 0.5, line_image, 1, 0)
+        if show_img:
+            cv2.imshow('Detected Lines', combined_image)
+    except Exception as e:
+        logger.error(f'Error displaying the image: {e}')
+        return None, None, None
 
     return [triggered, angle, distance, line_vector], connected_lines, combined_image
+
 
 if __name__ == "__main__":
     # Settings adjustment GUI

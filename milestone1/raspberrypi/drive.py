@@ -4,16 +4,17 @@ This is a python class to control driving
 __author__ = "Matt van Wijk"
 __date__ = "13/08/2024"
 
-import pigpio
-import math
+# start the pigpiod daemon
 import os
+os.system("sudo pigpiod")
+import math
+import pigpio
 import sys
-from time import sleep
 import time
-import threading
-from datetime import datetime, timedelta
 import RPi.GPIO as GPIO
 from Pcontrol import Controller
+import logging
+import logging.config
 
 class Drive:
     """ Represents a robot drive object """
@@ -25,19 +26,19 @@ class Drive:
         :param dirR: GPIO pin connected to the right stepper motor driver direction pin
         :param dirL: GPIO pin connected to the left stepper motor driver direction pin
         """
-         # start the pigpiod daemon
-        os.system("sudo pigpiod")
         self.stepL = stepL
         self.stepR = stepR
         self.dirL = dirL
         self.dirR = dirR
-        self.wheel_circumference = 95e-3 * math.pi # measured wheel diameter 55mm
+        self.wheel_diameter = 95e-3 * math.pi # measured wheel diameter 55mm
         self.traction_factor = 0.9
         self.steps_per_rev = 200
         self.stepping_mode = 1/8 # Assume 1/8 stepping
         self.pi = pigpio.pi()
         self.start_time = None
+        self.logger = logging.getLogger(__name__)
 
+        # This may raise warnings about GPIO being set already, ignore
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.dirL, GPIO.OUT)
         GPIO.setup(self.dirR, GPIO.OUT)
@@ -47,72 +48,117 @@ class Drive:
         if dirForward:
             GPIO.output(self.dirL, GPIO.HIGH)
             GPIO.output(self.dirR, GPIO.LOW)
+            self.logger.info("Setting drive direction as forward")
         else:
             GPIO.output(self.dirL, GPIO.LOW)
             GPIO.output(self.dirR, GPIO.HIGH)
+            self.logger.info("Setting drive direction as backwards")
 
     def drive(self, distance=0.2, speed=0.05, leftwheel_multilpier=1.0, rightwheel_multiplier=1.0):
         """ Function to start driving a specified distance in metres """
-        req_revolutions = distance/(self.traction_factor * self.wheel_circumference)
-        # print(f'#revolutions {req_revolutions}')
-        req_steps = req_revolutions * self.steps_per_rev * (1/self.stepping_mode)
-        # print(f'required steps {req_steps}')
-        
-        req_revs_per_sec = speed/(self.traction_factor * self.wheel_circumference)
-        # print(f'req_revs_per_sec {req_revs_per_sec}')
-        req_steps_per_sec = req_revs_per_sec * self.steps_per_rev * (1/self.stepping_mode) # PWM freq
-        #print(f'pwm freq = {int(req_steps_per_sec)}')
+        req_revolutions = distance/(self.traction_factor * self.wheel_diameter)
+        self.logger.debug(f'#Revolutions: {req_revolutions}')
 
-        # steering
+        req_steps = req_revolutions * self.steps_per_rev * (1/self.stepping_mode)
+        self.logger.debug(f'#Required steps: {req_steps}')
+        
+        req_revs_per_sec = speed/(self.traction_factor * self.wheel_diameter)
+        self.logger.debug(f'Required revs per sec: {req_revs_per_sec}')
+
+        req_steps_per_sec = req_revs_per_sec * self.steps_per_rev * (1/self.stepping_mode) # PWM freq
+        self.logger.debug(f'PWM frequency: {int(req_steps_per_sec)}')
+
+        # Steering
         left_steps_per_sec = req_steps_per_sec * leftwheel_multilpier
         right_steps_per_sec = req_steps_per_sec  * rightwheel_multiplier
         
         drive_time = req_steps/(req_steps_per_sec)
-        # print(f'Required steps {req_steps}')
-        # print(f'Required revs per second {req_revs_per_sec}')
-        print(f'Drive time {drive_time}s')
 
-        # self.setup_timer("Timer 1", drive_time, self.timer_function) 
-        
+        # ramp up driving from stop
+        self.logger.debug(f'quarter original speed for 0.2s')
+        self.pi.hardware_PWM(self.stepR, int(req_steps_per_sec/4), 500000)
+        self.pi.hardware_PWM(self.stepL, int(req_steps_per_sec/4), 500000)
+        self.start_time = time.time()
+        while time.time() - self.start_time < 0.2:
+            pass
+
+        # bit faster
+        self.logger.debug(f'half original speed for 0.2s')
+        self.pi.hardware_PWM(self.stepL, int(req_steps_per_sec/2), 500000)
+        self.pi.hardware_PWM(self.stepR, int(req_steps_per_sec/2), 500000)
+        self.start_time = time.time()
+        while time.time() - self.start_time < 0.2:
+            pass
+        # Start driving at desired speed
+        self.logger.info(f'Drive time at desired speed: {drive_time}s')        
         self.start_time = time.time()
         self.pi.hardware_PWM(self.stepL, int(left_steps_per_sec), 500000)
         self.pi.hardware_PWM(self.stepR, int(right_steps_per_sec), 500000)
         while time.time() - self.start_time < drive_time:
             pass
-        # now drive slower for a bit
+
+        # Now drive slower for a bit
+        self.logger.debug(f'Half original speed for 0.2s')
         self.pi.hardware_PWM(self.stepR, int(req_steps_per_sec/2), 500000)
         self.pi.hardware_PWM(self.stepL, int(req_steps_per_sec/2), 500000)
         self.start_time = time.time()
         while time.time() - self.start_time < 0.2:
             pass
+
         # even slower
+        self.logger.debug(f'Quarter original speed for 0.2s')
         self.pi.hardware_PWM(self.stepL, int(req_steps_per_sec/4), 500000)
         self.pi.hardware_PWM(self.stepR, int(req_steps_per_sec/4), 500000)
         self.start_time = time.time()
         while time.time() - self.start_time < 0.2:
             pass
+       
         # stop
-        self.pi.hardware_PWM(self.stepL, 0, 500000)
-        self.pi.hardware_PWM(self.stepR, 0, 500000)
+        self.all_stop()
 
-
-    # def setup_timer(self, name, duration_seconds, function):
-    #     """Sets up a timer to execute a function after a certain duration."""
-    #     def timer_thread():
-    #         #print(f"{name} timer started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    #         sleep(duration_seconds)
-    #         function(name)
-
-    #     thread = threading.Thread(target=timer_thread)
-    #     thread.start()
-
-    # def timer_function(self, name):
-    #     """Function to be executed when the timer expires."""
+    def tank_turn(self, direction=1, amount=0.1, speed=0.05):
+        req_revolutions = amount/(self.traction_factor * self.wheel_diameter)
+        req_steps = req_revolutions * self.steps_per_rev * (1/self.stepping_mode)
+        self.logger.debug(f'#Required steps: {req_steps}')
         
-    #     %print(f"{name} timer expired at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        req_revs_per_sec = speed/(self.traction_factor * self.wheel_diameter)
+        self.logger.debug(f'Required revs per sec: {req_revs_per_sec}')
+
+        req_steps_per_sec = req_revs_per_sec * self.steps_per_rev * (1/self.stepping_mode) # PWM freq
+        self.logger.debug(f'PWM frequency: {int(req_steps_per_sec)}')
+
+        drive_time = req_steps/(req_steps_per_sec)
+        
+        # turn right (clockwise)
+        if direction == 1:
+            GPIO.output(self.dirL, GPIO.HIGH)
+            GPIO.output(self.dirR, GPIO.HIGH)
+
+        else:
+            GPIO.output(self.dirL, GPIO.LOW)
+            GPIO.output(self.dirR, GPIO.LOW)
+        # Steering
+        left_steps_per_sec = req_steps_per_sec
+        right_steps_per_sec = req_steps_per_sec
+        self.start_time = time.time()
+        self.pi.hardware_PWM(self.stepL, int(left_steps_per_sec), 500000)
+        self.pi.hardware_PWM(self.stepR, int(right_steps_per_sec), 500000)
+        while time.time() - self.start_time < drive_time:
+            pass
+        # stop
+        self.all_stop()
+
+
+
+    def all_stop(self):
+        self.logger.debug(f'Stopping')
+        self.pi.hardware_PWM(self.stepR, 0, 500000)
+        self.pi.hardware_PWM(self.stepL, 0, 500000)
 
    
 if __name__ == "__main__":
+   logging.config.fileConfig('log.conf')
+   logger = logging.getLogger(__name__)
    robot = Drive()
    while True: 
         try:
@@ -126,13 +172,11 @@ if __name__ == "__main__":
             robot.set_1D_direction(dirForward=False)
             robot.drive(distance=0.4, speed=0.2, leftwheel_multilpier=lwheel, rightwheel_multiplier=rwheel)
             
-            #robot.drive(distance=1, speed=0.1, leftwheel_multilpier=0.5, rightwheel_multiplier=0.5)
             # while True:
             #     pass
 
-        except KeyboardInterrupt:
+        except:
             # terminate gracefully
-            robot.pi.hardware_PWM(robot.stepL, 0, 500000)
-            robot.pi.hardware_PWM(robot.stepR, 0, 500000)
+            robot.all_stop()
             GPIO.cleanup()
             sys.exit()

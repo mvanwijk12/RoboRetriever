@@ -1,12 +1,18 @@
-#!/usr/bin/env python3
+"""
+This is a python class for creating a server
+
+Modified from: https://realpython.com/python-sockets/ 
+"""
+__author__ = "Matt van Wijk"
+__date__ = "28/08/2024"
 
 import selectors
 import socket
 import traceback
 import libserver
 from threading import Thread, Condition
-
-# sel = selectors.DefaultSelector()
+import logging
+import logging.config
 
 class ConnectionServer:
     def __init__(self, host='', port= 65432):
@@ -21,7 +27,8 @@ class ConnectionServer:
         self.lsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.lsock.bind((host, port))
         self.lsock.listen()
-        print(f"Listening on {(host, port)}")
+        self.logger = logging.getLogger(__name__)
+        self.logger.info(f"Listening on {(host, port)}")
         self.lsock.setblocking(False)
         self.sel.register(self.lsock, selectors.EVENT_READ, data=None)
 
@@ -32,9 +39,8 @@ class ConnectionServer:
 
     def message_update(self):
         try:
-            while True:
-                if self.stop: return
-                events = self.sel.select(timeout=None)
+            while not self.stop:
+                events = self.sel.select(timeout=1)
                 for key, mask in events:
                     if key.data is None: # Initial
                         self.accept_wrapper(key.fileobj)
@@ -47,31 +53,38 @@ class ConnectionServer:
                                 self.msg_ready = True
                                 self.condition.notify_all()
                         except Exception:
-                            print(
+                            self.logger.error(
                                 f"Main: Error: Exception for {message.addr}:\n"
                                 f"{traceback.format_exc()}"
                             )
                             message.close()
     
         except (KeyboardInterrupt, RuntimeError):
-            print("Caught keyboard interrupt, exiting")
+            self.logger.info("Caught keyboard/RuntimeError interrupt, exiting")
         finally:
             self.sel.close()
 
     def get_message(self):
-        if not self.msg_ready:
-            with self.condition:
-                self.condition.wait()
-
-        self.msg_ready = False 
-        return self.msg
+        try:
+            success = False
+            while not success and not self.msg_ready:
+                with self.condition:
+                    success = self.condition.wait(timeout=1)
+        except: # catch all exceptions including KeyboardInterrupt
+            self.logger.error(f"Main: Error: Exception for {traceback.format_exc()}")
+            self.close()
+            raise Exception
+        else:
+            self.logger.debug('new msg received')
+            self.msg_ready = False 
+            return self.msg
 
     def close(self):
         self.stop = True
 
     def accept_wrapper(self, sock):
         conn, addr = sock.accept()  # Should be ready to read
-        print(f"Accepted connection from {addr}")
+        self.logger.info(f"Accepted connection from {addr}")
         conn.setblocking(False)
         message = libserver.Message(self.sel, conn, addr)
         self.sel.register(conn, selectors.EVENT_READ, data=message)
@@ -79,50 +92,13 @@ class ConnectionServer:
 
 
 if __name__ == "__main__":
+    logging.config.fileConfig('log.conf')
+    logger = logging.getLogger(__name__)
     con = ConnectionServer(host='').start()
-    try:
-        while True:
-            x = con.get_message()
-            if x is not None:
-                print(f"ERROR IS {x['error']}")
-            else:
-                print("NO DETECTIONS")
-    except KeyboardInterrupt:
-        con.close()
-        print('closing..')
-
-# if len(sys.argv) != 3:
-#     print(f"Usage: {sys.argv[0]} <host> <port>")
-#     sys.exit(1)
-
-# host, port = sys.argv[1], int(sys.argv[2])
-# host, port = '127.0.0.1', 65432
-# lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-# # Avoid bind() exception: OSError: [Errno 48] Address already in use
-# lsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-# lsock.bind((host, port))
-# lsock.listen()
-# print(f"Listening on {(host, port)}")
-# lsock.setblocking(False)
-# sel.register(lsock, selectors.EVENT_READ, data=None)
-
-# try:
-#     while True:
-#         events = sel.select(timeout=None)
-#         for key, mask in events:
-#             if key.data is None: # Initial
-#                 accept_wrapper(key.fileobj)
-#             else:
-#                 message = key.data
-#                 try:
-#                     message.process_events(mask)
-#                 except Exception:
-#                     print(
-#                         f"Main: Error: Exception for {message.addr}:\n"
-#                         f"{traceback.format_exc()}"
-#                     )
-#                     message.close()
-# except KeyboardInterrupt:
-#     print("Caught keyboard interrupt, exiting")
-# finally:
-#     sel.close()
+    # try:
+    while True:
+        x = con.get_message()
+        if x is not None:
+            con.logger.info(f"ERROR IS {x['error']}")
+        else:
+            con.logger.info("NO DETECTIONS")

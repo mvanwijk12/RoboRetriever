@@ -7,23 +7,25 @@ from scipy.interpolate import griddata
 # Variables
 CANNY_T_LOW = 50
 CANNY_T_HIGH = 150
-CANNY_APERTURE = 3
-HOUGH_THRESHOLD = 125
-HOUGH_LINE_LENGTH_MIN = 165
-HOUGH_LINE_GAP_MAX = 65
-CONNECT_DIST_MIN = 75
-CONNECT_ANGLE_MAX = 4
+CANNY_APERTURE = 7
+HOUGH_THRESHOLD = 140
+HOUGH_LINE_LENGTH_MIN = 140
+HOUGH_LINE_GAP_MAX = 100
+CONNECT_DIST_MIN = 50
+CONNECT_ANGLE_MAX = 5
 TRIGGER_SIZE = 0.5
 TRIGGER_OFFSET = 0.2
 
 image_mode_selected = True
-folder = "../../research/opencv_tests/court_lines/"
-image_file_names = ['20240820_124734.jpg','20240820_124438.jpg','20240820_124447.jpg','20240820_124451.jpg','20240820_124509.jpg','20240820_124511.jpg',
-                    '20240820_124521.jpg','20240820_124524.jpg','20240820_124535.jpg','20240820_124539.jpg','20240820_124551.jpg','20240820_124554.jpg',
-                    '20240820_124603.jpg','20240820_124612.jpg','20240820_124619.jpg','20240820_124626.jpg','20240820_124701.jpg','20240820_124708.jpg',
-                    '20240820_124732.jpg','20240820_124745.jpg','20240820_124802.jpg','20240820_124804.jpg','20240820_124806.jpg','20240820_124808.jpg',
-                    '20240820_124810.jpg','20240820_124820.jpg','20240820_124821.jpg','20240820_124826.jpg','20240820_124827.jpg','20240820_124831.jpg',
-                    '20240820_124833.jpg','20240820_124835.jpg','20240820_124838.jpg']
+#folder = "../../research/opencv_tests/court_lines/"
+folder = "../../research/opencv_tests/image_data/"
+# image_file_names = ['20240820_124734.jpg','20240820_124438.jpg','20240820_124447.jpg','20240820_124451.jpg','20240820_124509.jpg','20240820_124511.jpg',
+#                     '20240820_124521.jpg','20240820_124524.jpg','20240820_124535.jpg','20240820_124539.jpg','20240820_124551.jpg','20240820_124554.jpg',
+#                     '20240820_124603.jpg','20240820_124612.jpg','20240820_124619.jpg','20240820_124626.jpg','20240820_124701.jpg','20240820_124708.jpg',
+#                     '20240820_124732.jpg','20240820_124745.jpg','20240820_124802.jpg','20240820_124804.jpg','20240820_124806.jpg','20240820_124808.jpg',
+#                     '20240820_124810.jpg','20240820_124820.jpg','20240820_124821.jpg','20240820_124826.jpg','20240820_124827.jpg','20240820_124831.jpg',
+#                     '20240820_124833.jpg','20240820_124835.jpg','20240820_124838.jpg']
+image_file_names = ['img1.png','img2.png','img3.png','img4.png','img5.png','img6.png','img7.png','img8.png','img9.png','img10.png']
 current_image_index = 0
 
 WHITE = (255, 255, 255)
@@ -158,6 +160,7 @@ def detect_line(frame, show_img=False):
     try:
         # Convert to greyscale
         grey_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        #cv2.imshow('Grey',grey_image)
         logger.info('Converted frame to greyscale')
     except Exception as e:
         logger.error(f'Error converting frame to greyscale: {e}')
@@ -165,7 +168,8 @@ def detect_line(frame, show_img=False):
 
     try:
         # Apply Gaussian blur
-        blurred = cv2.GaussianBlur(grey_image, (5, 5), 0)
+        blurred = cv2.GaussianBlur(grey_image, (15, 15), 0)
+        cv2.imshow('Blurred', blurred)
         logger.info('Applied Gaussian blur')
     except Exception as e:
         logger.error(f'Error applying Gaussian blur: {e}')
@@ -173,7 +177,7 @@ def detect_line(frame, show_img=False):
 
     try:
         # Adaptive thresholding
-        adaptive_thresh = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+        adaptive_thresh = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 1)
         logger.info('Applied adaptive thresholding')
     except Exception as e:
         logger.error(f'Error applying adaptive thresholding: {e}')
@@ -183,7 +187,8 @@ def detect_line(frame, show_img=False):
         # Morphological operations
         kernel = np.ones((3, 3), np.uint8)
         dilated = cv2.dilate(adaptive_thresh, kernel, iterations=1)
-        eroded = cv2.erode(dilated, kernel, iterations=1)
+        eroded = cv2.erode(dilated, kernel, iterations=2)
+        cv2.imshow('Morphed', eroded)
         logger.info('Applied dilation and erosion to close tiny line gaps')
     except Exception as e:
         logger.error(f'Error applying morphological operations: {e}')
@@ -192,6 +197,7 @@ def detect_line(frame, show_img=False):
     try:
         # Edge detection
         edges = cv2.Canny(eroded, CANNY_T_LOW, CANNY_T_HIGH, apertureSize=CANNY_APERTURE)
+        cv2.imshow('Canny', edges)
         logger.info(f'Performed Canny edge detection with a threshold from {CANNY_T_LOW} to {CANNY_T_HIGH}, with an aperture of {CANNY_APERTURE}')
     except Exception as e:
         logger.error(f'Error performing Canny edge detection: {e}')

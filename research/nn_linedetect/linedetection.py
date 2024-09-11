@@ -17,7 +17,7 @@ load_dotenv()
 folder = "../opencv_tests/image_data/"
 image_file_names = ['img1.png','img2.png','img3.png','img4.png','img5.png','img6.png','img7.png','img8.png','img9.png','img10.png']
 
-current_image_index = 1
+current_image_index = 0
 
 image_file = folder+image_file_names[current_image_index]
 image = cv2.imread(image_file)
@@ -26,6 +26,15 @@ model = inference.get_model("roboretriver-linetest/1")
 results = model.infer(image)[0]
 
 detections = sv.Detections.from_inference(results)
+# An array of shape (n, 4) containing the bounding boxes coordinates in format [x1, y1, x2, y2]
+print(detections.xyxy)
+
+for box in detections.xyxy:
+    print(box)
+    print((box[0], box[1]))
+    #cv2.rectangle(image, (box[0], box[1]), (box[2], box[3]), (255,0,0), 2)
+
+cv2.imshow('Bounding Boxes', image)
 
 bounding_box_annotator = sv.PolygonAnnotator()
 label_annotator = sv.LabelAnnotator()

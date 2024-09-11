@@ -6,3 +6,4 @@ __pycache__/
 
 # images
 /research/opencv_tests/image_data/
+/research/opencv_tests/court_lines/

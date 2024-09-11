@@ -126,7 +126,7 @@ if __name__ == "__main__":
 
         while True:
             print("Robot ready for driving\n")
-            req_mode = input("Enter driving type, 1 for straight line, 2 for turn on spot: ")
+            req_mode = int(input("Enter driving type, 1 for straight line, 2 for turn on spot: "))
             if req_mode == 1:
                 req_detail = input("Enter direction, 1 for forward, 2 for backward: ")
                 if req_detail == 1:

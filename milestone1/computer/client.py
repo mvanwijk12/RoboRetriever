@@ -13,6 +13,7 @@ from inference import Inference
 import logging
 import logging.config
 import sys
+import camerastream as cs
 
 class ConnectionClient:
     MAX_RECONNECTION_ATTEMPTS = 10
@@ -88,7 +89,8 @@ if __name__ == "__main__":
     logging.config.fileConfig('log.conf')
     logger = logging.getLogger(__name__)
     con = ConnectionClient(hostname='robo-retriever.local')
-    res = Inference(src='tcp://robo-retriever.local:8554').start()
+    cs_stream = cs.CameraStream(src='tcp://robo-retriever.local:8554')
+    res = Inference(cs_stream).start()
     while True:
         detections = res.read_plot()
         con.send_detections(detections)

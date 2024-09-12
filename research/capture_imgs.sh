@@ -9,11 +9,20 @@ IMAGE_DIR="/home/e21/$TIMESTAMP"
 # Create the directory if it doesn't exist
 mkdir -p $IMAGE_DIR
 
-# Number of images to capture
+# Default number of images to capture and delay (in seconds)
 IMAGE_COUNT=5
-
-# Delay between captures (in seconds)
 DELAY=3
+
+# Parse command-line options for image count (-c) and delay (-d)
+while getopts c:d: flag
+do
+    case "${flag}" in
+        c) IMAGE_COUNT=${OPTARG};;  # Set image count
+        d) DELAY=${OPTARG};;        # Set delay
+        *) echo "Usage: $0 -c <image_count> -d <delay>"
+           exit 1;;
+    esac
+done
 
 # Start capturing images
 for ((i=1; i<=IMAGE_COUNT; i++))

@@ -1,10 +1,15 @@
-import os
-from dotenv import load_dotenv, dotenv_values
+from dotenv import load_dotenv
 import inference
 import supervision as sv
 import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+import math
 
 load_dotenv()
+
+TRIGGER_OFFSET = 0.2
+TRIGGER_SIZE = 0.5
 
 # folder = "../opencv_tests/court_lines/"
 # image_file_names = ['20240820_124734.jpg','20240820_124438.jpg','20240820_124447.jpg','20240820_124451.jpg','20240820_124509.jpg','20240820_124511.jpg',
@@ -20,21 +25,73 @@ image_file_names = ['img1.png','img2.png','img3.png','img4.png','img5.png','img6
 current_image_index = 0
 
 image_file = folder+image_file_names[current_image_index]
+image_orig = cv2.imread(image_file)
 image = cv2.imread(image_file)
 
 model = inference.get_model("roboretriver-linetest/1")
 results = model.infer(image)[0]
 
 detections = sv.Detections.from_inference(results)
-# An array of shape (n, 4) containing the bounding boxes coordinates in format [x1, y1, x2, y2]
-print(detections.xyxy)
 
-for box in detections.xyxy:
-    print(box)
-    print((box[0], box[1]))
-    #cv2.rectangle(image, (box[0], box[1]), (box[2], box[3]), (255,0,0), 2)
+# Draw bounding boxes
+# for box in detections.xyxy:
+#     cv2.rectangle(image, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (255,0,0), 2)
 
-cv2.imshow('Bounding Boxes', image)
+print("Mask shape:", detections.mask.shape)  # 3, 720, 1280
+
+# Draw trigger box
+height, width = image.shape[:2]
+height_offset = int(height * TRIGGER_OFFSET)
+box_center = (width // 2, height // 2 + height_offset)
+box_size = int(min(width, height) * TRIGGER_SIZE)
+box_x1 = math.floor(box_center[0] - box_size * (0.7+TRIGGER_SIZE))
+box_y1 = box_center[1] - box_size // 2
+box_x2 = math.floor(box_center[0] + box_size * (0.7+TRIGGER_SIZE))
+box_y2 = box_center[1] + box_size // 2
+cv2.rectangle(image, (box_x1, box_y1), (box_x2, box_y2), (0,0,255), 2)
+
+# Does it cross the trigger box
+triggered = False
+angle = None
+distance = None
+line_vector = np.array([0, 0])
+
+for mask in detections.mask:
+    binary_mask = (mask.astype(np.uint8)) * 255
+    contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cv2.drawContours(image, contours, -1, (0, 255, 0), 2)
+    cv2.fillPoly(image, contours, (0, 255, 0))
+
+    trigger_box = np.array([[box_x1, box_y1], [box_x2, box_y1], [box_x2, box_y2], [box_x1, box_y2]])
+    mask_points_inside_trigger = []
+
+    for contour in contours:
+        for point in contour:
+            x, y = point[0]
+            if box_x1 <= x <= box_x2 and box_y1 <= y <= box_y2:
+                mask_points_inside_trigger.append([x, y])
+
+    if mask_points_inside_trigger:
+        mask_points_inside_trigger = np.array(mask_points_inside_trigger)
+        [vx, vy, x0, y0] = cv2.fitLine(mask_points_inside_trigger, cv2.DIST_L2, 0, 0.01, 0.01)
+        a = vy
+        b = -vx
+
+        print([True, np.array([a,b])])
+
+        x1 = int(x0 - 1000 * vx)  # Extend the line for visualization
+        y1 = int(y0 - 1000 * vy)
+        x2 = int(x0 + 1000 * vx)
+        y2 = int(y0 + 1000 * vy)
+        cv2.line(image, (x1, y1), (x2, y2), (255, 0, 0), 2)
+    else:
+        print([False, (None,None)])
+
+
+
+
+#cv2.imshow('Original image', image_orig)
+#cv2.imshow('Bounding Boxes', image)
 
 bounding_box_annotator = sv.PolygonAnnotator()
 label_annotator = sv.LabelAnnotator()

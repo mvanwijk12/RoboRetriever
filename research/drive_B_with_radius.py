@@ -18,7 +18,7 @@ import logging.config
 
 class Drive_B:
     """ Represents a robot drive object """
-    def __init__(self, stepL=18, stepR=19, dirL=24, dirR=23):
+    def __init__(self, stepL=18, stepR=19, dirL=23, dirR=24):
         """ Initalise the Drive Object
         
         :param stepR: PWM pin connected to the right stepper motor driver step pin
@@ -26,6 +26,7 @@ class Drive_B:
         :param dirR: GPIO pin connected to the right stepper motor driver direction pin
         :param dirL: GPIO pin connected to the left stepper motor driver direction pin
         """
+        # Corrected assignment of direction pins as these had been reversed
         self.stepL = stepL
         self.stepR = stepR
         self.dirL = dirL
@@ -33,7 +34,7 @@ class Drive_B:
 
         # Set parameters for the robot
         self.wheel_diameter = 95e-3 * math.pi # measured wheel diameter 95mm
-        self.traction_factor = 0.9
+        self.traction_factor = 1
         self.steps_per_rev = 200
         self.stepping_mode = 1/8 # Assume 1/8 stepping
         self.wheel_spacing = 0.287 # Measured distance between inside contact points of wheels in m
@@ -41,13 +42,13 @@ class Drive_B:
         # Scaling factors to calibrate the driving accuracy
         self.diameter_scaleL = 1 # scaling factor for left wheel diameter
         self.diameter_scaleR = 1 # scaling factor for right wheel diameter
-        self.spacing_scale = 1 # scaling factor for wheel spacing
+        self.spacing_scale = 0.9839 # scaling factor for wheel spacing
 
         # Speed and acceleration parameters
         self.speed_restrict = 0.2 # speed restriction due to motor behaviour in week 7 lab
-        self.turn_rate_retrict = 40 # Turn rate limit in deg/s
+        self.turn_rate_retrict = 90 # Turn rate limit in deg/s
         self.acceleration = 0.1 # value in ms^-2
-        self.acceleration_time_step = 0.05 # number of seconds between speed updates
+        self.acceleration_time_step = 0.02 # number of seconds between speed updates
 
         self.pi = pigpio.pi()
         self.start_time = None
@@ -69,26 +70,30 @@ class Drive_B:
         """ Set the drive direction as either forwards or backwards for one of the wheels"""
         # The wheel direction reversal in Milestone 1 has been corrected,
         # so setting forward argument to true will result in forward movement
+        # The wheel direction pin assignment correction required changing some values here
         if dirForward:
             if sideLeft:
-                GPIO.output(self.dirL, GPIO.LOW)
+                GPIO.output(self.dirL, GPIO.HIGH)
                 self.logger.info('Setting drive direction, left wheel forward')
             else:
-                GPIO.output(self.dirR, GPIO.HIGH)
+                GPIO.output(self.dirR, GPIO.LOW)
                 self.logger.info('Setting drive direction, right wheel forward')
         else:
             if sideLeft:
-                GPIO.output(self.dirL, GPIO.HIGH)
+                GPIO.output(self.dirL, GPIO.LOW)
                 self.logger.info('Setting drive direction, left wheel backward')
             else:
-                GPIO.output(self.dirR, GPIO.LOW)
+                GPIO.output(self.dirR, GPIO.HIGH)
                 self.logger.info('Setting drive direction, right wheel backward')
 
 
     def set_drive_PWM(self, step_rate_L=1, step_rate_R=1, run_time=1):
         """ Perform the PWM operations to make a driving move"""
         # All arguments are positive
-        self.logger.debug(f'PWM left freq: {step_rate_L}, right freq:{step_rate_R} for {run_time} s"')
+
+        # This causes a lot of debug messages, comment out if not needed
+        # self.logger.debug(f'PWM left freq: {step_rate_L}, right freq:{step_rate_R} for {run_time} s"')
+
         self.pi.hardware_PWM(self.stepL, int(step_rate_L), 500000)
         self.pi.hardware_PWM(self.stepR, int(step_rate_R), 500000)
         self.start_time = time.time()
@@ -105,8 +110,10 @@ class Drive_B:
         else:
             rev_rate = edge_speed / (self.traction_factor * self.diameter_scaleR * self.wheel_diameter)
         step_rate = rev_rate * self.steps_per_rev * (1/self.stepping_mode)
-        self.logger.debug(f'Calculated PWM frequency as {step_rate}')
-        return step_rate
+        if step_rate > 0:
+            return step_rate
+        else:
+            return 0
 
 
     def calculate_limits(self, edge_speed_L=1, edge_speed_R=1):
@@ -123,7 +130,7 @@ class Drive_B:
 
         # Turning rate limiting
         # The robot turns if one wheel travels further than the other
-        distance_difference_per_360 = math.pi * self.wheel_spacing * self.spacing_scale
+        distance_difference_per_360 = 2 * math.pi * self.wheel_spacing / self.spacing_scale
         max_speed_difference = self.turn_rate_retrict * distance_difference_per_360 / 360
         if abs(edge_speed_L - edge_speed_R) > max_speed_difference:
             limit_by_turn = abs(max_speed_difference / abs(edge_speed_L - edge_speed_R))
@@ -140,6 +147,7 @@ class Drive_B:
         # Drive time represents the time value used in the speed and distance calculation,
         # this function accounts for the acceleration curve it makes
 
+        self.logger.info(f'Moving with speeds {edge_speed_L} and {edge_speed_R} for {drive_time} s')
         # Apply limits and adjust time to compensate if necessary
         limiting_factor = self.calculate_limits(edge_speed_L, edge_speed_R)
         self.logger.debug(f'Limiting factor applied: {limiting_factor}')
@@ -157,14 +165,23 @@ class Drive_B:
         else:
             self.set_wheel_direction(False, True)
         
-        # Check if there is room for acceleration curves
-        acceleration_distance_est = edge_speed_L * edge_speed_L / self.acceleration
-        self.logger.info(f'Moving with speeds {edge_speed_L} and {edge_speed_R} for {drive_time} s')
+        # Convert edge speeds to absolute values once the direction has been set
+        edge_speed_L = abs(edge_speed_L)
+        edge_speed_R = abs(edge_speed_R)
+        self.logger.debug(f'Drive direction set, speeds are now {edge_speed_L} and {edge_speed_R}')
+        
+        # Estimates for acceleration and constant speed drive time
+        acceleration_time = edge_speed_L / self.acceleration
+        straight_time = drive_time - acceleration_time # The average speed in acceleration is half, but there are two time peroiods
+        self.logger.debug(f'Accelerate for {acceleration_time} s and drive for {straight_time} s')
+
+        # TODO: Apply the acceleration to the average speed of the robot, not to one wheel
+        # TODO: Divide the distance test into three regions, slow moves over short distance and accelerate/decelerate for moderate distance
 
         # If no room, perform the drive slowly
-        if acceleration_distance_est >= edge_speed_L * drive_time:
-            self.logger.debug(f'Moving {edge_speed_L*drive_time} m slowly as no room to accelerate')
-            reduction = 0.05 / abs(edge_speed_L)
+        if straight_time < 0:
+            self.logger.debug(f'Moving {edge_speed_L * drive_time} m slowly as no room to accelerate')
+            reduction = 0.05 / edge_speed_L
             drive_time = drive_time / reduction
             edge_speed_L = 0.05
             edge_speed_R = reduction * edge_speed_R
@@ -179,10 +196,8 @@ class Drive_B:
             speed_ratio = edge_speed_R / edge_speed_L
             # Apply the target acceleration rate to the left wheel speed
             current_speed_L = 0
-            acceleration_steps = 0
-            self.logger.debug(f'Accelerating')
+            self.logger.debug(f'Accelerating at {self.acceleration} m/s^2')
             while current_speed_L < edge_speed_L:
-                acceleration_steps += 1
                 current_speed_L += self.acceleration * self.acceleration_time_step
                 current_speed_R = current_speed_L * speed_ratio
                 step_rate_L = self.convert_speed_PWM_rate(current_speed_L, True)
@@ -192,17 +207,16 @@ class Drive_B:
             # Constant acceleration allows the calculation that the distance travelled in accelerating
             # is half that that would be travelled at the target speed in the same time, allowing for the 
             # braking loop later means taking these values and subtracting them from the drive time
-            acceleration_time = acceleration_steps * self.acceleration_time_step
 
             # Drive most of the distance
-            self.logger.debug(f'Driving at constant speed')
+            self.logger.debug(f'Driving at constant speed for {straight_time} s')
             step_rate_L = self.convert_speed_PWM_rate(edge_speed_L, True)
             step_rate_R = self.convert_speed_PWM_rate(edge_speed_R, False)
-            self.set_drive_PWM(step_rate_L, step_rate_R, drive_time - acceleration_time)
+            self.set_drive_PWM(step_rate_L, step_rate_R, straight_time)
 
             # Constant deceleration loop
             current_speed_L = edge_speed_L
-            self.logger.debug(f'Decelerating')
+            self.logger.debug(f'Decelerating at {self.acceleration} m/s^2')
             while current_speed_L > 0:
                 current_speed_L -= self.acceleration * self.acceleration_time_step
                 current_speed_R = current_speed_L * speed_ratio
@@ -230,17 +244,19 @@ class Drive_B:
         """ Function to drive the steering method from Milestone 1"""
         # Negative distance for backwards driving, speed is converted to absolute value
         # Speed limiting is applied later
+        # Negative scaling is supported and drives that wheel in the other direction
         speed = abs(speed)
         drive_time = abs(distance / speed)
 
-        # Scaling is converted to be relative to the speed
-        scaling_L = abs(scaling_L)
-        scaling_R = abs(scaling_R)
-        average_scaling = (scaling_L + scaling_R) / 2
-        scaling_L = scaling_L / average_scaling
-        scaling_R = scaling_R / average_scaling
+        # Scaling is converted so that the base speed is the same after scaling
+        if scaling_L != -1 * scaling_R:
+            average_scaling = abs((scaling_L + scaling_R) / 2)
+            scaling_L = scaling_L / average_scaling
+            scaling_R = scaling_R / average_scaling
+            # in other case,
+            # the scalings are only of opposite sign, so the result should be that the base speed is the same
 
-        self.logger.info(f'Driving {distance} m at {speed} m/s, multipliers are {scaling_L} and {scaling_R}')
+        self.logger.info(f'Driving {distance} m, left wheel speed: {speed * scaling_L}, right wheel speed: {speed * scaling_R}')
         if distance >= 0:
             self.execute_drive(drive_time, speed * scaling_L, speed * scaling_R)
         else:
@@ -255,7 +271,7 @@ class Drive_B:
         speed = abs(speed)
         drive_time = abs(distance / speed)
         
-        distance_difference_per_360 = math.pi * self.wheel_spacing * self.spacing_scale
+        distance_difference_per_360 = 2 * math.pi * self.wheel_spacing / self.spacing_scale
         # For a given radius, 360 degrees must be met in 2*pi*radius
         if radius != 0:
             scaling_R = 1 - distance_difference_per_360 / (2 * 2 * math.pi * radius)
@@ -267,36 +283,26 @@ class Drive_B:
             self.execute_drive(drive_time, -1 * speed * scaling_L, -1 * speed * scaling_R)
 
 
-    def turn_to_angle(self, angle=1, speed=1, radius=1):
+    def turn_to_angle(self, angle=1, turn_rate=1, radius=1):
         """ Function to follow a curve of specified radius for a specified angle"""
         # Radius in metres, currently unable to drive backwards
         # Negative angles for left turn
         # Radius should be positive or zero
-        speed = abs(speed)
+        turn_rate = abs(turn_rate)
         radius = abs(radius)
 
-        # Calculate wheel speeds
-        distance_difference_per_360 = math.pi * self.wheel_spacing * self.spacing_scale
+        distance_difference_per_360 = 2 * math.pi * self.wheel_spacing / self.spacing_scale
 
         if angle != 0:
-            if radius == 0:
-                # Use one wheel speed with the speed parameter, expect this to get scaled sometimes
-                distance_L = (angle * distance_difference_per_360) / (360 * 2)
-                distance_R = -1 * (angle * distance_difference_per_360) / (360 * 2)
-                drive_time = abs(distance_L / speed)
-                self.logger.info(f'Turning {angle} degrees on the spot')
-                self.execute_drive(drive_time, speed, -1 * speed)
-
-            else:
-                # Use the average speed with the speed parameter, expect this to get scaled sometimes
-                average_distance = 2 * math.pi * radius / angle
-                distance_L = average_distance + (angle * distance_difference_per_360) / (360 * 2)
-                distance_R = average_distance - (angle * distance_difference_per_360) / (360 * 2)
-                drive_time = average_distance / speed # use one wheel's distance as the average may be zero
-                scaling_L = (distance_L / average_distance)
-                scaling_R = (distance_R / average_distance)
-                self.logger.info(f'Turning {angle} degrees by driving {average_distance} m around a {radius} m circle')
-                self.execute_drive(drive_time, speed * scaling_L, speed * scaling_R)
+            average_distance = abs(2 * math.pi * radius * angle / 360)
+            distance_L = average_distance + (angle * distance_difference_per_360) / (360 * 2)
+            distance_R = average_distance - (angle * distance_difference_per_360) / (360 * 2)
+            drive_time = abs(angle / turn_rate)
+            speed_L = distance_L / drive_time
+            speed_R = distance_R / drive_time
+            self.logger.info(f'Turning {angle} degrees by driving {average_distance} m around a {radius} m circle')
+            self.logger.debug(f'Wheel speeds are left: {speed_L}, right: {speed_R}')
+            self.execute_drive(drive_time, speed_L, speed_R)
 
 
 
@@ -340,17 +346,23 @@ if __name__ == "__main__":
             
             if req_mode == 3:
                 print("Currently unable to drive backwards in this mode")
-                angle = float(input("Enter angle to turn, negtive values for left turn"))
-                speed = float(input("Enter speed in m/s: "))
+                angle = float(input("Enter angle to turn, negtive values for left turn: "))
+                turn_rate = float(input("Enter turn rate in degrees/s: "))
                 radius = float(input("Enter radius in m, should be positive or zero: "))
                 print("Caution: Robot about to move")
                 time.sleep(1)
-                robot.turn_to_angle(angle, speed, radius)
+                robot.turn_to_angle(angle, turn_rate, radius)
 
 
         except Exception as e:
             # terminate gracefully
             robot.logger.info(f'Exception: {e}')
+            robot.all_stop()
+            GPIO.cleanup()
+            sys.exit()
+
+        except KeyboardInterrupt:
+            # terminate gracefully
             robot.all_stop()
             GPIO.cleanup()
             sys.exit()

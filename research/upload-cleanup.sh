@@ -8,12 +8,12 @@ for dir in "$TARGET_DIR"/2024*/; do
     if [ -d "$dir" ]; then
 
         echo "Uploading to G-Drive..."
-        cd "$TARGET_DIR/$dir"
+        cd $dir
 
         if /home/e21/data-venv/bin/drive add_remote --pid 1UyrnengsetC2KwwI0Q-vrXF5I9H4RCKW ; then
             echo "UPLOAD SUCCESSFUL!"
             echo "Deleting local copy of images"
-            if rm -r "$TARGET_DIR/$dir" ; then
+            if rm -r "$dir" ; then
         	    echo "Delete successful"
             else 
               echo "Delete failed"

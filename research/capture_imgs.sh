@@ -12,11 +12,13 @@ mkdir -p $IMAGE_DIR
 # Default number of images to capture and delay (in seconds)
 IMAGE_COUNT=5
 DELAY=3
+UPLOAD=false
 
 # Parse command-line options for image count (-c) and delay (-d)
-while getopts c:d: flag
+while getopts uc:d: flag
 do
     case "${flag}" in
+    	u) UPLOAD=true;;
         c) IMAGE_COUNT=${OPTARG};;  # Set image count
         d) DELAY=${OPTARG};;        # Set delay
         *) echo "Usage: $0 -c <image_count> -d <delay>"
@@ -46,20 +48,26 @@ do
 done
 
 echo "All $IMAGE_COUNT images have been captured."
-echo "Uploading to G-Drive..."
 
-cd $IMAGE_DIR
+if [ "$UPLOAD" = true ] ; then
 
-if /home/e21/data-venv/bin/drive add_remote --pid 1UyrnengsetC2KwwI0Q-vrXF5I9H4RCKW ; then
-    echo "UPLOAD SUCCESSFUL!"
-    echo "Deleting local copy of images"
-    if rm -r $IMAGE_DIR ; then
-	    echo "Delete successful"
-    else 
-        echo "Delete failed"
-    fi
+	echo "Uploading to G-Drive..."
+	
+	cd $IMAGE_DIR
+	
+	if /home/e21/data-venv/bin/drive add_remote --pid 1UyrnengsetC2KwwI0Q-vrXF5I9H4RCKW ; then
+	    echo "UPLOAD SUCCESSFUL!"
+	    echo "Deleting local copy of images"
+	    if rm -r $IMAGE_DIR ; then
+		    echo "Delete successful"
+	    else 
+		echo "Delete failed"
+	    fi
+	else
+	    echo "ERROR: UPLOAD FAILED!"
+	    echo "Check that you have internet connection!"
+	    echo "Local copies of images preserved"
+	fi
 else
-    echo "ERROR: UPLOAD FAILED!"
-    echo "Check that you have internet connection!"
-    echo "Local copies of images preserved"
+	echo "Images saved locally."
 fi

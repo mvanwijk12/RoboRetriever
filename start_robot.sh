@@ -8,7 +8,7 @@
 ENV_NAME="RoboRetriever"
 
 # Specify the directory where the Python file is located
-SCRIPT_DIR="/path/to/repo/RoboRetriever/milestone1/computer"
+SCRIPT_DIR="/path/to/repo/RoboRetriever/src/computer"
 
 # Specify the Python file to execute
 PYTHON_FILE="client.py"

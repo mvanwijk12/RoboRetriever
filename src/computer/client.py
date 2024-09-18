@@ -86,11 +86,13 @@ class ConnectionClient:
         
 
 if __name__ == "__main__":
+    HOSTNAME = 'robo-retriever.local'
+
     # create self.logger
     logging.config.fileConfig('log.conf')
     logger = logging.getLogger(__name__)
-    con = ConnectionClient(hostname='robo-retriever.local')
-    cs_stream = cs.CameraStream().start()
+    con = ConnectionClient(hostname=HOSTNAME)
+    cs_stream = cs.CameraStream(src=f'tcp://{HOSTNAME}:8554').start()
     res = Inference(cs_stream).start()
     trag = Tragectory(cs_stream).start()
     while True:

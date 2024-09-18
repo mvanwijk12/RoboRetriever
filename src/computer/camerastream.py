@@ -15,7 +15,7 @@ import logging.config
 import time
 
 class CameraStream:
-    def __init__(self, src='tcp://robo-retriever.local:8554', frame_h=720, frame_w=1280):
+    def __init__(self, src='tcp://robo-retriever.local:8554', max_con_attempts=5, frame_h=720, frame_w=1280):
         """ Initialises the camera stream object, set src=0 for testing with webcam """
         self.stopped = False
         self.has_new = []
@@ -25,10 +25,23 @@ class CameraStream:
         self.logger = logging.getLogger(__name__)
 
         # Setup cv2 VideoCapture
-        self.stream = cv2.VideoCapture(src)
+        stream_opened = False
+        attempts = 0
+        while not stream_opened and attempts < max_con_attempts:
+            attempts += 1
+            self.logger.info(f'Opening video stream - attempt {attempts}/{max_con_attempts}...')
+            self.stream = cv2.VideoCapture(src)
+            stream_opened = self.stream.isOpened()
+            time.sleep(1)
+
+        if attempts >= max_con_attempts:
+            self.logger.error(f'Failed to open video stream - max connection attempts reached')
+            raise Exception('Maximum Connection Attempts Reached - Failed to Resolve Hostname')
+        
+
         self.stream.set(cv2.CAP_PROP_BUFFERSIZE, 0) # No buffer so we grab the most recent frame
-        # self.stream.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_h)
-        # self.stream.set(cv2.CAP_PROP_FRAME_WIDTH, frame_w)
+        self.stream.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_h)
+        self.stream.set(cv2.CAP_PROP_FRAME_WIDTH, frame_w)
         (self.grabbed, self.frame) = self.stream.read()
         
     def start(self):

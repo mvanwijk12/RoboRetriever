@@ -1,7 +1,7 @@
 """
 This is a revised python class to control driving, based on the Milestone 1 drive class
 """
-__author__ = "Matt van Wijk, Alexander Jones"
+__author__ = "Matt van Wijk, Alex Jones"
 __date__ = "12/09/2024"
 
 # start the pigpiod daemon

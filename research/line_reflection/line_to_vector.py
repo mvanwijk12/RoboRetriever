@@ -5,7 +5,7 @@ __date__ = "04/09/2024"
 import math
 import numpy as np
 
-def angle_converter(line):
+def line_to_vector(line):
     # Input is line in the form ax+by=c, only uses a and b
     initial_direction = np.array([0,1])
     normal_direction = line/np.linalg.norm(line)
@@ -14,5 +14,5 @@ def angle_converter(line):
 
 if __name__ == "__main__":
     test_line = np.array([2,3])
-    result = angle_converter(test_line)
+    result = line_to_vector(test_line)
     print(result)

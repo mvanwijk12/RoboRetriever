@@ -5,7 +5,7 @@ __date__ = "12/09/2024"
 import math
 import numpy as np
 
-def turn_to_vector(vector):
+def vector_to_angle(vector):
     # Converts target direction into number of degrees to the right to turn
     # Input vector is normalised target direction as numpy array
     turn_fraction = vector[1] / vector[0]
@@ -28,5 +28,5 @@ def turn_to_vector(vector):
 
 if __name__ == "__main__":
     test_vector = np.array([1,1])
-    result = turn_to_vector(test_vector)
+    result = vector_to_angle(test_vector)
     print(result)

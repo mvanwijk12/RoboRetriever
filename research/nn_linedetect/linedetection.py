@@ -24,22 +24,8 @@ image_file_names = ['image_1-2024-09-13_14-08-15.jpg','image_2-2024-09-13_14-08-
                     'image_13-2024-09-13_14-08-15.jpg','image_14-2024-09-13_14-08-15.jpg','image_15-2024-09-13_14-08-15.jpg','image_16-2024-09-13_14-08-15.jpg',
                     'image_17-2024-09-13_14-08-15.jpg','image_18-2024-09-13_14-08-15.jpg','image_19-2024-09-13_14-08-15.jpg','image_20-2024-09-13_14-08-15.jpg']
 
-current_image_index = 0 # 19
-
+current_image_index = 19 # 19
 image_file = folder+image_file_names[current_image_index]
-image_orig = cv2.imread(image_file)
-image = cv2.imread(image_file)
-
-# Draw trigger box
-height, width = image.shape[:2]
-height_offset = int(height * TRIGGER_OFFSET)
-box_center = (width // 2, height // 2 + height_offset)
-box_size = int(min(width, height) * TRIGGER_SIZE)
-box_x1 = math.floor(box_center[0] - box_size * (0.7+TRIGGER_SIZE))
-box_y1 = box_center[1] - box_size // 2
-box_x2 = math.floor(box_center[0] + box_size * (0.7+TRIGGER_SIZE))
-box_y2 = box_center[1] + box_size // 2
-cv2.rectangle(image, (box_x1, box_y1), (box_x2, box_y2), (0,0,255), 2)
 
 # Does it cross the trigger box
 triggered = False
@@ -61,11 +47,36 @@ def detect_line(masks):
 
         return np.array([a,1])
 
-    for line in masks:
-        line_mask = np.array(line.data[0])  # 3D array of 1
+    # Function to find if a mask crosses the trigger box
+    def calc_trigger(mask, box_width_ratio=0.8, box_height_ratio=0.25, bottom_offset_ratio=0.1):
+        frame_height, frame_width = mask.shape
+        box_width = int(box_width_ratio * frame_width)
+        box_height = int(box_height_ratio * frame_height)
+        box_x_start = (frame_width - box_width) // 2
+        box_y_start = int(frame_height * (1 - bottom_offset_ratio - box_height_ratio)) 
+
+        indices = np.argwhere(mask == 1)
+        line_in_box = [
+            [x, y] for y, x in indices
+            if box_x_start <= x <= box_x_start + box_width and box_y_start <= y <= box_y_start + box_height
+        ]
+
+        if line_in_box:
+            return True
+        else:
+            return False
+        
+    # Function to calculate the mask coverage across the frame
+    def calc_cover(mask):
         mask_con = np.sum(line_mask==0)
         mask_pro = np.sum(line_mask==1)
-        print("Mask coverage: ", mask_pro/(mask_con+mask_pro))
+        return "Mask coverage: " + (mask_pro/(mask_con+mask_pro))*100 + "%"
+
+
+    for line in masks:
+        line_mask = np.array(line.data[0])  # 3D array of 1
+        print(calc_cover(line_mask))
+        print(calc_trigger(line_mask))
         print(calc_single_line(line_mask))
         print("\n")
 

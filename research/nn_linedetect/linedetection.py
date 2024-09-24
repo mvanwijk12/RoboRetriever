@@ -1,10 +1,5 @@
 from ultralytics import YOLO
-import cv2
 import numpy as np
-import math
-
-TRIGGER_OFFSET = 0.2
-TRIGGER_SIZE = 0.5
 
 # folder = "../opencv_tests/court_lines/"
 # image_file_names = ['20240820_124734.jpg','20240820_124438.jpg','20240820_124447.jpg','20240820_124451.jpg','20240820_124509.jpg','20240820_124511.jpg',
@@ -27,19 +22,13 @@ image_file_names = ['image_1-2024-09-13_14-08-15.jpg','image_2-2024-09-13_14-08-
 current_image_index = 19 # 19
 image_file = folder+image_file_names[current_image_index]
 
-# Does it cross the trigger box
-triggered = False
-angle = None
-distance = None
-line_vector = np.array([0, 0])
-
 
 def detect_line(masks):
     # Function to fit and return a line equation from a single mask
     def calc_single_line(mask):
         indices = np.argwhere(mask == 1)  # Just get the 1s
-        x_coords = indices[:, 1]
-        y_coords = indices[:, 0]
+        x_coords = indices[:, 1]  # Rows
+        y_coords = indices[:, 0]  # Columns
 
         # Least squares method
         A = np.vstack([x_coords, np.ones(len(x_coords))]).T
@@ -70,23 +59,30 @@ def detect_line(masks):
     def calc_cover(mask):
         mask_con = np.sum(line_mask==0)
         mask_pro = np.sum(line_mask==1)
-        return "Mask coverage: " + (mask_pro/(mask_con+mask_pro))*100 + "%"
+        return "Mask coverage: " + str((mask_pro/(mask_con+mask_pro))*100) + "%"
 
-
+    arr_out = []
+    triggered = False
     for line in masks:
         line_mask = np.array(line.data[0])  # 3D array of 1
-        print(calc_cover(line_mask))
-        print(calc_trigger(line_mask))
-        print(calc_single_line(line_mask))
-        print("\n")
+        #print(calc_cover(line_mask))
+
+        # TODO: return only the main line (biggest in box)
+        if calc_trigger(line_mask):
+            # if the line is in the trigger box
+            triggered = True
+            arr_out.append(calc_single_line(line_mask))
+    
+    return triggered, None, None, arr_out
 
 
-model = YOLO('best.pt')
-detections = model.predict([image_file], classes=1)  # class 1 is line
+if __name__ == "__main__":
+    model = YOLO('best.pt')
+    detections = model.predict([image_file], classes=1)  # class 1 is line
 
-for result in detections:
-    masks = result.masks
-    #print(masks.shape)
-    detect_line(masks)
+    for result in detections:
+        masks = result.masks
+        #print(masks.shape)
+        print(detect_line(masks))
 
-    result.show()
+        result.show()

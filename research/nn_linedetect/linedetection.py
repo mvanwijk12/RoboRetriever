@@ -1,8 +1,15 @@
 from ultralytics import YOLO
 import numpy as np
+import cv2
+
+def detect_line(masks, box_width_ratio=0.8, box_height_ratio=0.25, bottom_offset_ratio=0.1, visualise=False, orig_img=None):
+    frame_height, frame_width = masks[0].data[0].shape
+    box_width = int(box_width_ratio * frame_width)
+    box_height = int(box_height_ratio * frame_height)
+    box_x_start = (frame_width - box_width) // 2
+    box_y_start = int(frame_height * (1 - bottom_offset_ratio - box_height_ratio)) 
 
 
-def detect_line(masks):
     # Function to fit and return a line equation from a single mask
     def calc_single_line(mask):
         indices = np.argwhere(mask == 1)  # Just get the 1s
@@ -16,13 +23,7 @@ def detect_line(masks):
         return np.array([a,1])
 
     # Function to find if a mask crosses the trigger box and by how much
-    def calc_trigger(mask, box_width_ratio=0.8, box_height_ratio=0.25, bottom_offset_ratio=0.1):
-        frame_height, frame_width = mask.shape
-        box_width = int(box_width_ratio * frame_width)
-        box_height = int(box_height_ratio * frame_height)
-        box_x_start = (frame_width - box_width) // 2
-        box_y_start = int(frame_height * (1 - bottom_offset_ratio - box_height_ratio)) 
-
+    def calc_trigger(mask):
         indices = np.argwhere(mask == 1)  # coords of 1s
         line_in_box = [
             [x, y] for y, x in indices
@@ -42,7 +43,6 @@ def detect_line(masks):
         mask_pro = np.sum(mask==1)
         return "Mask coverage: " + str((mask_pro/(mask_con+mask_pro))*100) + "%"
 
-
     trig_lines = []
     triggered = False
     largest_line = [None, None]
@@ -56,6 +56,15 @@ def detect_line(masks):
             triggered = True
             trig_lines.append((calc_single_line(line_mask), trig_amount))
             largest_line = max(trig_lines, key=lambda x: x[1])
+    
+    if visualise:
+        top_left = (box_x_start, box_y_start)
+        bottom_right = (box_x_start + box_width, box_y_start + box_height)
+        img_resize = cv2.resize(orig_img, (frame_width, frame_height))
+        viz = cv2.rectangle(img_resize, top_left, bottom_right, 255, 2)
+        cv2.imshow("Image with Trigger Box", viz)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
     
     return triggered, largest_line[0]  # formerly trig (bin), angle, distance, np array of a and b
 
@@ -79,15 +88,18 @@ if __name__ == "__main__":
                         'image_13-2024-09-13_14-08-15.jpg','image_14-2024-09-13_14-08-15.jpg','image_15-2024-09-13_14-08-15.jpg','image_16-2024-09-13_14-08-15.jpg',
                         'image_17-2024-09-13_14-08-15.jpg','image_18-2024-09-13_14-08-15.jpg','image_19-2024-09-13_14-08-15.jpg','image_20-2024-09-13_14-08-15.jpg']
 
-    current_image_index = 0 # 19
+    current_image_index = 19 # 19
     image_file = folder+image_file_names[current_image_index]
 
     model = YOLO('best.pt')
     detections = model.predict([image_file], classes=1)  # class 1 is line
+    result = detections[0]
+    masks = result.masks
 
-    for result in detections:
-        masks = result.masks
-        #print(masks.shape)
+    visualise = True
+
+    if visualise:
+        img = result.plot()
+        print(detect_line(masks, visualise=True, orig_img=img))
+    else:
         print(detect_line(masks))
-
-        result.show()

@@ -2,7 +2,8 @@ from ultralytics import YOLO
 import numpy as np
 import cv2
 
-def detect_line(masks, box_width_ratio=0.8, box_height_ratio=0.25, bottom_offset_ratio=0.1, visualise=False, orig_img=None):
+def detect_line(masks, box_width_ratio=0.9, box_height_ratio=0.25, bottom_offset_ratio=0.05, orig_img=None):
+    # Initialise the trigger box
     frame_height, frame_width = masks[0].data[0].shape
     box_width = int(box_width_ratio * frame_width)
     box_height = int(box_height_ratio * frame_height)
@@ -57,14 +58,12 @@ def detect_line(masks, box_width_ratio=0.8, box_height_ratio=0.25, bottom_offset
             trig_lines.append((calc_single_line(line_mask), trig_amount))
             largest_line = max(trig_lines, key=lambda x: x[1])
     
-    if visualise:
+    if orig_img is not None:
         top_left = (box_x_start, box_y_start)
         bottom_right = (box_x_start + box_width, box_y_start + box_height)
         img_resize = cv2.resize(orig_img, (frame_width, frame_height))
         viz = cv2.rectangle(img_resize, top_left, bottom_right, 255, 2)
-        cv2.imshow("Image with Trigger Box", viz)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        cv2.imshow("Detected Lines with Trigger Box", viz)
     
     return triggered, largest_line[0]  # formerly trig (bin), angle, distance, np array of a and b
 
@@ -88,7 +87,7 @@ if __name__ == "__main__":
                         'image_13-2024-09-13_14-08-15.jpg','image_14-2024-09-13_14-08-15.jpg','image_15-2024-09-13_14-08-15.jpg','image_16-2024-09-13_14-08-15.jpg',
                         'image_17-2024-09-13_14-08-15.jpg','image_18-2024-09-13_14-08-15.jpg','image_19-2024-09-13_14-08-15.jpg','image_20-2024-09-13_14-08-15.jpg']
 
-    current_image_index = 19 # 19
+    current_image_index = 17 # 19
     image_file = folder+image_file_names[current_image_index]
 
     model = YOLO('best.pt')
@@ -100,6 +99,8 @@ if __name__ == "__main__":
 
     if visualise:
         img = result.plot()
-        print(detect_line(masks, visualise=True, orig_img=img))
+        print(detect_line(masks, orig_img=img))
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
     else:
         print(detect_line(masks))

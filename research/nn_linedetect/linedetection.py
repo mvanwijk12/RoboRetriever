@@ -24,12 +24,10 @@ def detect_line(masks, box_width_ratio=0.9, box_height_ratio=0.25, bottom_offset
         a, c = np.linalg.lstsq(A, y_coords, rcond=None)[0]
 
         # Clip the line to the frame for visualisation
-        y1 = int(a * 0 + c)
         x1 = 0
-        y2 = int(a * frame_width + c)
         x2 = frame_width
-        y1 = np.clip(y1, 0, frame_height)
-        y2 = np.clip(y2, 0, frame_height)
+        y1 = np.clip(int(a * 0 + c), 0, frame_height)
+        y2 = np.clip(int(a * frame_width + c), 0, frame_height)
 
         return [np.array([a,1]), (x1, y1, x2, y2)]
 

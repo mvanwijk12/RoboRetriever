@@ -14,14 +14,22 @@ def detect_line(masks, box_width_ratio=0.9, box_height_ratio=0.25, bottom_offset
     # Function to fit and return a line equation from a single mask
     def calc_single_line(mask):
         indices = np.argwhere(mask == 1)  # Just get the 1s
-        x_coords = indices[:, 1]  # Rows
-        y_coords = indices[:, 0]  # Columns
+        x_coords = indices[:, 1]  # Cols
+        y_coords = indices[:, 0]  # Rows
 
-        # Least squares method
+        # Least squares method to get y=mx+c
         A = np.vstack([x_coords, np.ones(len(x_coords))]).T
         a, c = np.linalg.lstsq(A, y_coords, rcond=None)[0]
 
-        return np.array([a,1])
+        # Clip the line to the frame for visualisation
+        y1 = int(a * 0 + c)
+        x1 = 0
+        y2 = int(a * frame_width + c)
+        x2 = frame_width
+        y1 = np.clip(y1, 0, frame_height)
+        y2 = np.clip(y2, 0, frame_height)
+
+        return [np.array([a,1]), (x1, y1, x2, y2)]
 
     # Function to find if a mask crosses the trigger box and by how much
     def calc_trigger(mask):
@@ -47,6 +55,7 @@ def detect_line(masks, box_width_ratio=0.9, box_height_ratio=0.25, bottom_offset
     trig_lines = []
     triggered = False
     largest_line = [None, None]
+    x_lines = (None, None, None, None)
     for line in masks:
         line_mask = np.array(line.data[0])  # 3D array of 1
         #print(calc_cover_frame(line_mask))
@@ -55,15 +64,21 @@ def detect_line(masks, box_width_ratio=0.9, box_height_ratio=0.25, bottom_offset
         if trig_amount is not None:
             # if the line is in the trigger box
             triggered = True
-            trig_lines.append((calc_single_line(line_mask), trig_amount))
+            single_line, x_lines = calc_single_line(line_mask)
+            trig_lines.append((single_line, trig_amount))
             largest_line = max(trig_lines, key=lambda x: x[1])
     
+    # Perform visualisation if given the original image
     if orig_img is not None:
+        # Add a trigger box
         top_left = (box_x_start, box_y_start)
         bottom_right = (box_x_start + box_width, box_y_start + box_height)
         img_resize = cv2.resize(orig_img, (frame_width, frame_height))
-        viz = cv2.rectangle(img_resize, top_left, bottom_right, 255, 2)
-        cv2.imshow("Detected Lines with Trigger Box", viz)
+        trig_viz = cv2.rectangle(img_resize, top_left, bottom_right, 255, 2)
+        x1, y1, x2, y2 = x_lines
+        line_viz = cv2.line(trig_viz, (x1, y1), (x2, y2), (0, 0, 255), 2)
+
+        cv2.imshow("Detected Lines with Trigger Box", line_viz)
     
     return triggered, largest_line[0]  # formerly trig (bin), angle, distance, np array of a and b
 
@@ -87,7 +102,7 @@ if __name__ == "__main__":
                         'image_13-2024-09-13_14-08-15.jpg','image_14-2024-09-13_14-08-15.jpg','image_15-2024-09-13_14-08-15.jpg','image_16-2024-09-13_14-08-15.jpg',
                         'image_17-2024-09-13_14-08-15.jpg','image_18-2024-09-13_14-08-15.jpg','image_19-2024-09-13_14-08-15.jpg','image_20-2024-09-13_14-08-15.jpg']
 
-    current_image_index = 17 # 19
+    current_image_index = 19 # 19
     image_file = folder+image_file_names[current_image_index]
 
     model = YOLO('best.pt')

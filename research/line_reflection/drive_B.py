@@ -11,9 +11,9 @@ import math
 import pigpio
 import sys
 import time
-import RPi.GPIO as GPIO
 import logging
 import logging.config
+import numpy as np
 
 
 class Drive_B:
@@ -55,16 +55,17 @@ class Drive_B:
         self.logger = logging.getLogger(__name__)
 
         # This may raise warnings about GPIO being set already, ignore
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(self.dirL, GPIO.OUT)
-        GPIO.setup(self.dirR, GPIO.OUT)
+        self.pi.set_mode(self.dirL, pigpio.OUTPUT)
+        self.pi.set_mode(self.dirR, pigpio.OUTPUT)
 
 
     def all_stop(self):
         self.logger.debug(f'Stopping')
         self.pi.hardware_PWM(self.stepR, 0, 500000)
         self.pi.hardware_PWM(self.stepL, 0, 500000)
-
+        
+    def delete(self):
+        self.pi.stop()
 
     def set_wheel_direction(self, sideLeft=True, dirForward=True):
         """ Set the drive direction as either forwards or backwards for one of the wheels"""
@@ -73,17 +74,17 @@ class Drive_B:
         # The wheel direction pin assignment correction required changing some values here
         if dirForward:
             if sideLeft:
-                GPIO.output(self.dirL, GPIO.HIGH)
+                self.pi.write(self.dirL, pigpio.HIGH)
                 self.logger.info('Setting drive direction, left wheel forward')
             else:
-                GPIO.output(self.dirR, GPIO.LOW)
+                self.pi.write(self.dirR, pigpio.LOW)
                 self.logger.info('Setting drive direction, right wheel forward')
         else:
             if sideLeft:
-                GPIO.output(self.dirL, GPIO.LOW)
+                self.pi.write(self.dirL, pigpio.LOW)
                 self.logger.info('Setting drive direction, left wheel backward')
             else:
-                GPIO.output(self.dirR, GPIO.HIGH)
+                self.pi.write(self.dirR, pigpio.HIGH)
                 self.logger.info('Setting drive direction, right wheel backward')
 
 
@@ -138,7 +139,7 @@ class Drive_B:
             limit_by_turn = 1
         
         self.logger.debug(f'Limiting factors: speed_L: {limit_by_speed_L}, speed_R: {limit_by_speed_R}, turn_rate: {limit_by_turn}')
-        return(min(limit_by_speed_L, limit_by_speed_R, limit_by_turn))
+        return (min(limit_by_speed_L, limit_by_speed_R, limit_by_turn))
 
 
     def execute_drive(self, drive_time=1, edge_speed_L=1, edge_speed_R=1):
@@ -172,7 +173,7 @@ class Drive_B:
         
         # Estimates for acceleration and constant speed drive time
         acceleration_time = edge_speed_L / self.acceleration
-        straight_time = drive_time - acceleration_time # The average speed in acceleration is half, but there are two time peroiods
+        straight_time = drive_time - acceleration_time # The average speed in acceleration is half, but there are two time periods
         self.logger.debug(f'Accelerate for {acceleration_time} s and drive for {straight_time} s')
 
         # TODO: Apply the acceleration to the average speed of the robot, not to one wheel
@@ -188,7 +189,6 @@ class Drive_B:
             step_rate_L = self.convert_speed_PWM_rate(edge_speed_L, True)
             step_rate_R = self.convert_speed_PWM_rate(edge_speed_R, False)
             self.set_drive_PWM(step_rate_L, step_rate_R, drive_time)
-
             self.all_stop()
 
         else:
@@ -283,11 +283,12 @@ class Drive_B:
             self.execute_drive(drive_time, -1 * speed * scaling_L, -1 * speed * scaling_R)
 
 
-    def turn_to_angle(self, angle=1, turn_rate=1, radius=1):
+    def _turn_to_angle(self, angle, turn_rate, radius):
         """ Function to follow a curve of specified radius for a specified angle"""
         # Radius in metres, currently unable to drive backwards
-        # Negative angles for left turn
+        # Negative angles for left turn, angle in degrees
         # Radius should be positive or zero
+        # turn_rate is the angular velocity in degrees/sec
         turn_rate = abs(turn_rate)
         radius = abs(radius)
 
@@ -304,6 +305,46 @@ class Drive_B:
             self.logger.debug(f'Wheel speeds are left: {speed_L}, right: {speed_R}')
             self.execute_drive(drive_time, speed_L, speed_R)
 
+    def _line_to_vector(self, line):
+        """ Takes in a line of the form ax + by = c (where line = [a, b]), and gives reflected line as per geometric optics """
+        # Input is line in the form ax+by=c, only uses a and b
+        initial_direction = np.array([0,1])
+        normal_direction = line/np.linalg.norm(line)
+        reflected_direction = initial_direction - (2*np.dot(initial_direction,normal_direction))*normal_direction
+        return reflected_direction/np.linalg.norm(reflected_direction)
+
+    def _vector_to_angle(self, vector):
+        """ Converts target direction into number of degrees to the right to turn """
+        # Input vector is normalised target direction as numpy array
+        turn_fraction = vector[1] / vector[0]
+        arctan_value = 0
+        turn_angle = 0
+        if vector[0] < 0:
+            arctan_value = math.atan(-1 * turn_fraction)
+            turn_angle = 180 - (arctan_value * 180 / math.pi)
+
+        else:
+            arctan_value = math.atan(turn_fraction)
+            turn_angle = arctan_value * 180 / math.pi
+
+        # Turn angle is number of degrees to the right, negative values for left turn
+        return turn_angle
+    
+    def rebound_off_line(self, line, turn_rate=1, turn_radius=1):
+        """ Takes in an equation of a line and executes a reflected turn """
+        # Radius in metres, currently unable to drive backwards
+        # Radius should be positive or zero
+        # turn_rate is the angular velocity in degrees/sec
+
+        # Calculate reflected direction
+        reflect_dir = self._line_to_vector(line)
+
+        # Calculate turn angle
+        turn_angle = self._vector_to_angle(reflect_dir)
+
+        # Execute turn
+        self._turn_to_angle(self, turn_angle, turn_rate=turn_rate, radius=turn_radius)
+
 
 
 if __name__ == "__main__":
@@ -319,6 +360,7 @@ if __name__ == "__main__":
             print("1: Driving steered as in Milestone 1")
             print("2: Constant radius with specified arc length")
             print("3: Constant radius with specified angle")
+            print("4: Rebound off line")
             req_mode = int(input("Enter driving mode: "))
             if req_mode == 0:
                 distance = float(input("Enter distance, negative for backwards driving: "))
@@ -327,7 +369,7 @@ if __name__ == "__main__":
                 time.sleep(1)
                 robot.straight_drive(distance, speed)
             
-            if req_mode == 1:
+            elif req_mode == 1:
                 distance = float(input("Enter distance, negative for backwards driving: "))
                 speed = float(input("Enter base speed in m/s: "))
                 multiplier_L = float(input("Enter left wheel multiplier: "))
@@ -336,7 +378,7 @@ if __name__ == "__main__":
                 time.sleep(1)
                 robot.relative_drive(distance, speed, multiplier_L, multiplier_R)
 
-            if req_mode == 2:
+            elif req_mode == 2:
                 distance = float(input("Enter distance, negative for backwards driving: "))
                 speed = float(input("Enter speed in m/s: "))
                 radius = float(input("Enter radius in m, negative values for left turn: "))
@@ -344,25 +386,37 @@ if __name__ == "__main__":
                 time.sleep(1)
                 robot.turn_to_distance(distance, speed, radius)
             
-            if req_mode == 3:
+            elif req_mode == 3:
                 print("Currently unable to drive backwards in this mode")
                 angle = float(input("Enter angle to turn, negtive values for left turn: "))
                 turn_rate = float(input("Enter turn rate in degrees/s: "))
                 radius = float(input("Enter radius in m, should be positive or zero: "))
                 print("Caution: Robot about to move")
                 time.sleep(1)
-                robot.turn_to_angle(angle, turn_rate, radius)
+                robot._turn_to_angle(angle, turn_rate, radius)
+
+            else:
+                a = float(input("Enter line [a, b], a-value: "))
+                b = float(input("Enter line [a, b], b-value: "))
+                line = np.array([a, b])
+                turn_rate = float(input("Enter turn rate/angular velocity (deg/s): "))
+                turn_radius = float(input("Enter turn radius (m): "))
+                print("Caution: Robot about to move")
+                time.sleep(1)
+                robot.rebound_off_line(line, turn_rate=turn_rate, turn_radius=turn_radius)
 
 
         except Exception as e:
             # terminate gracefully
             robot.logger.info(f'Exception: {e}')
             robot.all_stop()
-            GPIO.cleanup()
+            robot.delete()
             sys.exit()
 
         except KeyboardInterrupt:
             # terminate gracefully
             robot.all_stop()
-            GPIO.cleanup()
+            robot.delete()
             sys.exit()
+
+            

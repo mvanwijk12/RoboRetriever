@@ -60,11 +60,13 @@ class Drive_B:
 
 
     def all_stop(self):
+        """ Sets wheel velocities to zero """
         self.logger.debug(f'Stopping')
         self.pi.hardware_PWM(self.stepR, 0, 500000)
         self.pi.hardware_PWM(self.stepL, 0, 500000)
         
     def delete(self):
+        """ Safely cleans up GPIO ports, to be called after self.all_stop() """
         self.pi.stop()
 
     def set_wheel_direction(self, sideLeft=True, dirForward=True):
@@ -284,7 +286,12 @@ class Drive_B:
 
 
     def _turn_to_angle(self, angle, turn_rate, radius):
-        """ Function to follow a curve of specified radius for a specified angle"""
+        """ Function to follow a curve of specified radius for a specified angle
+        
+        :param angle: angle in degrees for the robot to turn in the rightward direction, negative angle corresponds to a leftward turn
+        :param turn_rate: the angular velocity of the turn in degrees/second
+        :param radius: the turning radius in metres (non-negative value)
+        """
         # Radius in metres, currently unable to drive backwards
         # Negative angles for left turn, angle in degrees
         # Radius should be positive or zero
@@ -301,49 +308,47 @@ class Drive_B:
             drive_time = abs(angle / turn_rate)
             speed_L = distance_L / drive_time
             speed_R = distance_R / drive_time
-            self.logger.info(f'Turning {angle} degrees by driving {average_distance} m around a {radius} m circle')
+            self.logger.info(f'Turning {angle} degrees at {turn_rate} degrees/second by driving {average_distance} m around a {radius} m circle')
             self.logger.debug(f'Wheel speeds are left: {speed_L}, right: {speed_R}')
             self.execute_drive(drive_time, speed_L, speed_R)
 
-    def _line_to_vector(self, line):
-        """ Takes in a line of the form ax + by = c (where line = [a, b]), and gives reflected line as per geometric optics """
-        # Input is line in the form ax+by=c, only uses a and b
-        initial_direction = np.array([0,1])
-        normal_direction = line/np.linalg.norm(line)
-        reflected_direction = initial_direction - (2*np.dot(initial_direction,normal_direction))*normal_direction
-        return reflected_direction/np.linalg.norm(reflected_direction)
 
-    def _vector_to_angle(self, vector):
-        """ Converts target direction into number of degrees to the right to turn """
-        # Input vector is normalised target direction as numpy array
-        turn_fraction = vector[1] / vector[0]
-        arctan_value = 0
-        turn_angle = 0
-        if vector[0] < 0:
-            arctan_value = math.atan(-1 * turn_fraction)
-            turn_angle = 180 - (arctan_value * 180 / math.pi)
-
-        else:
-            arctan_value = math.atan(turn_fraction)
-            turn_angle = arctan_value * 180 / math.pi
-
-        # Turn angle is number of degrees to the right, negative values for left turn
-        return turn_angle
+    def _reflect_line_to_angle(self, rline):
+        """ Converts the reflected line in the form a*x + b*y = 0 to a turn angle for the robot to move assuming optical dynamics. 
+        
+        :param rline: reflected line equation as a numpy array [a, b] where a*x + b*y = 0
+        :returns: angle in degrees for the robot to turn in the rightward direction, negative angle corresponds to a leftward turn 
+        """
+        return math.atan2(rline[1], -rline[0]) * 180/math.pi
     
-    def rebound_off_line(self, line, turn_rate=1, turn_radius=1):
-        """ Takes in an equation of a line and executes a reflected turn """
-        # Radius in metres, currently unable to drive backwards
-        # Radius should be positive or zero
-        # turn_rate is the angular velocity in degrees/sec
-
+    def _reflection_line(self, line):
+        """ Calculates the equation of the reflected line for an incidence direction of (x, y) = (0, 1) and a mirror line given by line.
+        The reflected line is calculated assuming optical dynamics.
+        
+        :param line: mirror line equation as a numpy array [a, b] where a*x + b*y = 0
+        :returns: reflected line equation as a numpy array [c, d] where c*x + d*y = 0
+        """
+        incidence_direction = np.array([1,0])
+        normalized_mirror_direction = line/np.linalg.norm(line)
+        reflected_direction = incidence_direction - (2*np.dot(incidence_direction, normalized_mirror_direction))*normalized_mirror_direction
+        return reflected_direction/np.linalg.norm(reflected_direction)
+    
+    def rebound_off_line(self, line, turn_rate=20, turn_radius=0.1):
+        """ Takes in an equation of the mirror line and executes a reflected turn assuming optical dynamics.
+         
+        :param line: mirror line equation as a numpy array [a, b] where a*x + b*y = 0
+        :param turn_rate: the angular velocity of the turn in degrees/second
+        :param turn_radius: the turning radius in metres (non-negative value)
+        """
         # Calculate reflected direction
-        reflect_dir = self._line_to_vector(line)
+        reflect_dir = self._reflection_line(line)
+        self.logger.debug(f'Reflected line is {reflect_dir[0]}x + {reflect_dir[1]}y = 0')
 
         # Calculate turn angle
-        turn_angle = self._vector_to_angle(reflect_dir)
+        turn_angle = self._reflect_line_to_angle(reflect_dir)
 
         # Execute turn
-        self._turn_to_angle(self, turn_angle, turn_rate=turn_rate, radius=turn_radius)
+        self._turn_to_angle(turn_angle, turn_rate, turn_radius)
 
 
 
@@ -395,7 +400,7 @@ if __name__ == "__main__":
                 time.sleep(1)
                 robot._turn_to_angle(angle, turn_rate, radius)
 
-            else:
+            elif req_mode == 4:
                 a = float(input("Enter line [a, b], a-value: "))
                 b = float(input("Enter line [a, b], b-value: "))
                 line = np.array([a, b])
@@ -404,6 +409,9 @@ if __name__ == "__main__":
                 print("Caution: Robot about to move")
                 time.sleep(1)
                 robot.rebound_off_line(line, turn_rate=turn_rate, turn_radius=turn_radius)
+
+            else:
+                print('Invalid selection')
 
 
         except Exception as e:

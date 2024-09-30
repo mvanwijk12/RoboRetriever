@@ -10,7 +10,7 @@ def detect_line(masks, box_width_ratio=0.9, box_height_ratio=0.25, bottom_offset
     box_width = int(box_width_ratio * frame_width)
     box_height = int(box_height_ratio * frame_height)
     box_x_start = (frame_width - box_width) // 2
-    box_y_start = int(frame_height * (1 - bottom_offset_ratio - box_height_ratio)) 
+    box_y_start = int(frame_height * (1 - bottom_offset_ratio - box_height_ratio))
 
 
     # Function to fit and return a line equation from a single mask
@@ -24,10 +24,10 @@ def detect_line(masks, box_width_ratio=0.9, box_height_ratio=0.25, bottom_offset
         a, c = np.linalg.lstsq(A, y_coords, rcond=None)[0]
 
         # Clip the line to the frame for visualisation
-        x1 = 0
-        x2 = frame_width
-        y1 = np.clip(int(a * 0 + c), 0, frame_height)
-        y2 = np.clip(int(a * frame_width + c), 0, frame_height)
+        x1 = np.min(x_coords)
+        x2 = np.max(x_coords)
+        y1 = np.clip(int(a * x1 + c), 0, frame_height)
+        y2 = np.clip(int(a * x2 + c), 0, frame_height)
 
         return [np.array([a,1]), (x1, y1, x2, y2)]
 
@@ -117,7 +117,7 @@ if __name__ == "__main__":
                         'image_13-2024-09-13_14-08-15.jpg','image_14-2024-09-13_14-08-15.jpg','image_15-2024-09-13_14-08-15.jpg','image_16-2024-09-13_14-08-15.jpg',
                         'image_17-2024-09-13_14-08-15.jpg','image_18-2024-09-13_14-08-15.jpg','image_19-2024-09-13_14-08-15.jpg','image_20-2024-09-13_14-08-15.jpg']
 
-    current_image_index = 19 # 19
+    current_image_index = 0 # 19
     image_file = folder+image_file_names[current_image_index]
 
     model = YOLO('best.pt')

@@ -4,17 +4,18 @@ import cv2
 import logging
 import logging.config
 
-def detect_line(masks, box_width_ratio=0.9, box_height_ratio=0.25, bottom_offset_ratio=0.05, orig_img=None, viz_type=1):
-    # Initialise the trigger box
-    frame_height, frame_width = masks[0].data[0].shape
-    box_width = int(box_width_ratio * frame_width)
-    box_height = int(box_height_ratio * frame_height)
-    box_x_start = (frame_width - box_width) // 2
-    box_y_start = int(frame_height * (1 - bottom_offset_ratio - box_height_ratio))
-
-
-    # Function to fit and return a line equation from a single mask
-    def calc_single_line(mask):
+class LineDetector:
+    def __init__(self, box_width_ratio=0.9, box_height_ratio=0.25, bottom_offset_ratio=0.05, viz_type=1):
+        self.box_width_ratio = box_width_ratio
+        self.box_height_ratio = box_height_ratio
+        self.bottom_offset_ratio = bottom_offset_ratio
+        self.viz_type = viz_type
+        self.box_width = None
+        self.box_height = None
+        self.box_x_start = None
+        self.box_y_start = None
+    
+    def _calc_single_line(self, mask, frame_height):
         indices = np.argwhere(mask == 1)  # Just get the 1s
         x_coords = indices[:, 1]  # Cols
         y_coords = indices[:, 0]  # Rows
@@ -29,74 +30,80 @@ def detect_line(masks, box_width_ratio=0.9, box_height_ratio=0.25, bottom_offset
         y1 = np.clip(int(a * x1 + c), 0, frame_height)
         y2 = np.clip(int(a * x2 + c), 0, frame_height)
 
-        return [np.array([a,1]), (x1, y1, x2, y2)]
-
-    # Function to find if a mask crosses the trigger box and by how much
-    def calc_trigger(mask):
+        return [np.array([a, 1]), (x1, y1, x2, y2)]
+    
+    def _calc_trigger(self, mask):
         indices = np.argwhere(mask == 1)  # coords of 1s
         line_in_box = [
             [x, y] for y, x in indices
-            if box_x_start <= x <= box_x_start + box_width and box_y_start <= y <= box_y_start + box_height
+            if self.box_x_start <= x <= self.box_x_start + self.box_width and self.box_y_start <= y <= self.box_y_start + self.box_height
         ]
 
         if line_in_box:
-            trigger_box = mask[box_y_start:box_y_start + box_height, box_x_start:box_x_start + box_width]
+            trigger_box = mask[self.box_y_start:self.box_y_start + self.box_height, self.box_x_start:self.box_x_start + self.box_width]
             trig_pro = np.sum(trigger_box == 1)
             return trig_pro
         else:
             return None
-        
-    # Function to calculate the mask coverage across the frame
-    def calc_cover_frame(mask):
-        mask_con = np.sum(mask==0)
-        mask_pro = np.sum(mask==1)
-        return "Mask coverage: " + str((mask_pro/(mask_con+mask_pro))*100) + "%"
 
-    trig_lines = []
-    triggered = False
-    largest_line = [None, None]
-    x_lines = (None, None, None, None)
+    def _calc_cover_frame(self, mask):
+        mask_con = np.sum(mask == 0)
+        mask_pro = np.sum(mask == 1)
+        return "Mask coverage: " + str((mask_pro / (mask_con + mask_pro)) * 100) + "%"
 
-    # Perform visualisation if given the original image
-    if orig_img is not None:
-        img_resize = cv2.resize(orig_img, (frame_width, frame_height))
-        if viz_type == 1:
-        # Add a trigger box
-            top_left = (box_x_start, box_y_start)
-            bottom_right = (box_x_start + box_width, box_y_start + box_height)
-            trig_viz = cv2.rectangle(img_resize, top_left, bottom_right, 255, 2)
+    def detect(self, masks, orig_img=None):
+        # Initialise the trigger box
+        frame_height, frame_width = masks[0].data[0].shape
+        self.box_width = int(self.box_width_ratio * frame_width)
+        self.box_height = int(self.box_height_ratio * frame_height)
+        self.box_x_start = (frame_width - self.box_width) // 2
+        self.box_y_start = int(frame_height * (1 - self.bottom_offset_ratio - self.box_height_ratio))
 
-    # Go through all lines
-    for line in masks:
-        line_mask = np.array(line.data[0])  # 3D array of 1
-        #print(calc_cover_frame(line_mask))
-        trig_amount = calc_trigger(line_mask)
-        single_line, x_lines = calc_single_line(line_mask)
+        trig_lines = []
+        triggered = False
+        largest_line = [None, None]
+        x_lines = (None, None, None, None)
 
-        # For viz
-        line_col = (0, 255, 0)
-        line_thc = 1
+        # Perform visualisation if given the original image
+        if orig_img is not None:
+            img_resize = cv2.resize(orig_img, (frame_width, frame_height))
+            if self.viz_type == 1:
+                # Add a trigger box
+                top_left = (self.box_x_start, self.box_y_start)
+                bottom_right = (self.box_x_start + self.box_width, self.box_y_start + self.box_height)
+                trig_viz = cv2.rectangle(img_resize, top_left, bottom_right, 255, 2)
 
-        if trig_amount is not None:
-            # if the line is in the trigger box
-            triggered = True
-            trig_lines.append((single_line, trig_amount))
-            largest_line = max(trig_lines, key=lambda x: x[1])
+        # Go through all lines
+        for line in masks:
+            line_mask = np.array(line.data[0])  # 3D array of 1
+            trig_amount = self._calc_trigger(line_mask)
+            single_line, x_lines = self._calc_single_line(line_mask, frame_height)
 
             # For viz
-            line_col = (0, 0, 255)
-            line_thc = 2
+            line_col = (0, 255, 0)
+            line_thc = 1
 
-        # Add line as visualisation
-        if orig_img is not None:
-            x1, y1, x2, y2 = x_lines
-            if viz_type == 1:             
-                line_viz = cv2.line(trig_viz, (x1, y1), (x2, y2), line_col, line_thc)
-            else:
-                line_viz = cv2.line(img_resize, (x1, y1), (x2, y2), line_col, line_thc)
-            cv2.imshow("Detected Lines with Trigger Box", line_viz)
-    
-    return triggered, largest_line[0]  # formerly trig (bin), angle, distance, np array of a and b
+            if trig_amount is not None:
+                # if the line is in the trigger box
+                triggered = True
+                trig_lines.append((single_line, trig_amount))
+                largest_line = max(trig_lines, key=lambda x: x[1])
+
+                # For viz
+                line_col = (0, 0, 255)
+                line_thc = 2
+
+            # Add line as visualisation
+            if orig_img is not None:
+                x1, y1, x2, y2 = x_lines
+                if self.viz_type == 1:
+                    line_viz = cv2.line(trig_viz, (x1, y1), (x2, y2), line_col, line_thc)
+                else:
+                    line_viz = cv2.line(img_resize, (x1, y1), (x2, y2), line_col, line_thc)
+                cv2.imshow("Detected Lines with Trigger Box", line_viz)
+
+        return triggered, largest_line[0]  # formerly trig (bin), angle, distance, np array of a and b
+
 
 
 if __name__ == "__main__":
@@ -129,13 +136,15 @@ if __name__ == "__main__":
     result = detections[0]
     masks = result.masks
 
-    visualise = True
+    visualise = False
+    
+    detector = LineDetector(viz_type=0)
 
     if visualise:
-        #img = result.plot()  # visualise with the bounding boxes and masks
-        img = cv2.imread(image_file)  # visualise with only the image
-        print(detect_line(masks, orig_img=img, viz_type=0))
+        img = result.plot()  # visualise with the bounding boxes and masks
+        #img = cv2.imread(image_file)  # visualise with only the image
+        print(detector.detect(masks, orig_img=img))
         cv2.waitKey(0)
         cv2.destroyAllWindows()
     else:
-        print(detect_line(masks))
+        print(detector.detect(masks))

@@ -4,7 +4,7 @@ import cv2
 import logging
 import logging.config
 
-def detect_line(masks, box_width_ratio=0.9, box_height_ratio=0.25, bottom_offset_ratio=0.05, orig_img=None):
+def detect_line(masks, box_width_ratio=0.9, box_height_ratio=0.25, bottom_offset_ratio=0.05, orig_img=None, viz_type=1):
     # Initialise the trigger box
     frame_height, frame_width = masks[0].data[0].shape
     box_width = int(box_width_ratio * frame_width)
@@ -59,11 +59,12 @@ def detect_line(masks, box_width_ratio=0.9, box_height_ratio=0.25, bottom_offset
 
     # Perform visualisation if given the original image
     if orig_img is not None:
-        # Add a trigger box
-        top_left = (box_x_start, box_y_start)
-        bottom_right = (box_x_start + box_width, box_y_start + box_height)
         img_resize = cv2.resize(orig_img, (frame_width, frame_height))
-        trig_viz = cv2.rectangle(img_resize, top_left, bottom_right, 255, 2)
+        if viz_type == 1:
+        # Add a trigger box
+            top_left = (box_x_start, box_y_start)
+            bottom_right = (box_x_start + box_width, box_y_start + box_height)
+            trig_viz = cv2.rectangle(img_resize, top_left, bottom_right, 255, 2)
 
     # Go through all lines
     for line in masks:
@@ -88,8 +89,11 @@ def detect_line(masks, box_width_ratio=0.9, box_height_ratio=0.25, bottom_offset
 
         # Add line as visualisation
         if orig_img is not None:
-            x1, y1, x2, y2 = x_lines                
-            line_viz = cv2.line(trig_viz, (x1, y1), (x2, y2), line_col, line_thc)
+            x1, y1, x2, y2 = x_lines
+            if viz_type == 1:             
+                line_viz = cv2.line(trig_viz, (x1, y1), (x2, y2), line_col, line_thc)
+            else:
+                line_viz = cv2.line(img_resize, (x1, y1), (x2, y2), line_col, line_thc)
             cv2.imshow("Detected Lines with Trigger Box", line_viz)
     
     return triggered, largest_line[0]  # formerly trig (bin), angle, distance, np array of a and b
@@ -128,8 +132,9 @@ if __name__ == "__main__":
     visualise = True
 
     if visualise:
-        img = result.plot()
-        print(detect_line(masks, orig_img=img))
+        #img = result.plot()  # visualise with the bounding boxes and masks
+        img = cv2.imread(image_file)  # visualise with only the image
+        print(detect_line(masks, orig_img=img, viz_type=0))
         cv2.waitKey(0)
         cv2.destroyAllWindows()
     else:

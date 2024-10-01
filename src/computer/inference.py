@@ -15,10 +15,17 @@ import cv2
 import time
 import logging
 from copy import deepcopy
+from camerastream import CameraStream
+from linedetection import LineDetector
 
 
 class Inference:
-    def __init__(self, cs_stream, model_path='../../models/yolov8m.pt', frame_h=720, frame_w=1280):
+    BOX_CLS = 0
+    LINES_CLS = 1 
+    TENNIS_BALL_CLS = 2
+    CLASS_NAMES = ['box', 'line', 'tennis-ball']
+
+    def __init__(self, cs_stream, model_path='best.pt', frame_h=720, frame_w=1280):
         """ Initialises the camera stream object """
         self.stopped = False
         self.has_new = False
@@ -29,7 +36,6 @@ class Inference:
         self.condition = Condition()
         self.frame = None
         self.model = YOLO(model_path)
-        self.desired_class_ids = [key for key, value in self.model.names.items() if value == 'sports ball']
         self.img_frame = None
         self.num_counter_above_threshold = 0 # counts the number of detections within distance_threshold
         self.start_time_above_threshold = 0 # records the start time of the first detection within distance_threshold
@@ -38,12 +44,13 @@ class Inference:
         self.time_threshold = 120 # in seconds
         self.stop_condition = False
         self.logger = logging.getLogger(__name__)
+        self.ld = LineDetector()
 
     def start(self):
         Thread(target=self.process_image_update, args=()).start()
         return self
 
-    def process_image_update(self, conf=0.2):
+    def process_image_update(self, conf=0.5):
         while True:
             if self.stopped: return
 
@@ -52,23 +59,41 @@ class Inference:
 
             # Run inference
             result = self.model.track(source=self.frame, persist=True, conf=conf, verbose=False)[0]
-            self.class_names = result.names
 
             # Convert to sv detection object
-            detections = sv.Detections.from_ultralytics(result)
+            self.detections = sv.Detections.from_ultralytics(result)
             if result.boxes.id is not None:
-                detections.tracker_id = result.boxes.id.cpu().numpy().astype(int) # TODO: replace with cuda instead of cpu()?
+                self.detections.tracker_id = result.boxes.id.cpu().numpy().astype(int) # TODO: replace with cuda instead of cpu()?
 
             # Filter detections to only keep desired classes using mask
-            mask = np.isin(detections.class_id, self.desired_class_ids)
+            mask_box = np.isin(self.detections.class_id, self.BOX_CLS)
+            mask_line = np.isin(self.detections.class_id, self.LINES_CLS)
+            mask_tennis_ball = np.isin(self.detections.class_id, self.TENNIS_BALL_CLS)
 
             # Apply the mask to filter the detections
-            self.filtered_detections = sv.Detections(
-                xyxy=detections.xyxy[mask],
-                confidence=detections.confidence[mask],
-                class_id=detections.class_id[mask],
-                tracker_id=detections.tracker_id[mask] if detections.tracker_id is not None else None,
-                data={key: value[mask] for key, value in detections.data.items()} if detections.data else None
+            self.box_detections = sv.Detections(
+                xyxy=self.detections.xyxy[mask_box],
+                confidence=self.detections.confidence[mask_box],
+                class_id=self.detections.class_id[mask_box],
+                tracker_id=self.detections.tracker_id[mask_box] if self.detections.tracker_id is not None else None,
+                data={key: value[mask_box] for key, value in self.detections.data.items()} if self.detections.data else None
+            )
+
+            self.line_detections = sv.Detections(
+                xyxy=self.detections.xyxy[mask_line],
+                confidence=self.detections.confidence[mask_line],
+                class_id=self.detections.class_id[mask_line],
+                tracker_id=self.detections.tracker_id[mask_line] if self.detections.tracker_id is not None else None,
+                data={key: value[mask_line] for key, value in self.detections.data.items()} if self.detections.data else None,
+                mask=self.detections.mask[mask_line] if self.detections.mask is not None else None
+            )
+
+            self.tennis_ball_detections = sv.Detections(
+                xyxy=self.detections.xyxy[mask_tennis_ball],
+                confidence=self.detections.confidence[mask_tennis_ball],
+                class_id=self.detections.class_id[mask_tennis_ball],
+                tracker_id=self.detections.tracker_id[mask_tennis_ball] if self.detections.tracker_id is not None else None,
+                data={key: value[mask_tennis_ball] for key, value in self.detections.data.items()} if self.detections.data else None
             )
             
             # Retrieve the image
@@ -86,7 +111,7 @@ class Inference:
                 self.condition.wait()
 
         self.has_new = False 
-        return self.filtered_detections
+        return self.box_detections, self.line_detections, self.tennis_ball_detections
     
     def read_plot(self):
         if not self.has_new:
@@ -95,32 +120,66 @@ class Inference:
 
         # Copy the filtered detection for processing
         self.has_new = False
-        filtered_detects = deepcopy(self.filtered_detections)
+        box_detects = deepcopy(self.box_detections)
+        line_detects = deepcopy(self.line_detections)
+        tennis_ball_detects = deepcopy(self.tennis_ball_detections)
+        detects = deepcopy(self.detections)
         image_frame = deepcopy(self.img_frame)
 
         # Create Annotators
         box_annotator = sv.BoxAnnotator() 
         label_annotator = sv.LabelAnnotator()
 
-        n_detected_tennis_balls = len(filtered_detects.xyxy)
+        n_detected_tennis_balls = len(tennis_ball_detects.xyxy)
         self.logger.info(f'Number of detected tennis ball: {n_detected_tennis_balls}')
         
         # Handle the case there are no detections and tracker_id is None
-        if filtered_detects.tracker_id is None:
-            tracker_id_array = np.array([])
+        if tennis_ball_detects.tracker_id is None:
+            tennis_ball_tracker_id_array = np.array([])
         else:
-            tracker_id_array = filtered_detects.tracker_id
+            tennis_ball_tracker_id_array = tennis_ball_detects.tracker_id
 
-        labels = [
-                f"#{tracker_id} {self.class_names[class_id]} {confidence:0.2f} error: {1/2*(xyxy[0] + xyxy[2]) - self.frame_w/2:0.0f}"
+        tennis_ball_labels = [
+                f"#{tracker_id} {self.CLASS_NAMES[class_id]} {confidence:0.2f} error: {1/2*(xyxy[0] + xyxy[2]) - self.frame_w/2:0.0f}"
                 for tracker_id, class_id, confidence, xyxy
-                in zip(tracker_id_array, filtered_detects.class_id, filtered_detects.confidence, filtered_detects.xyxy)
+                in zip(tennis_ball_tracker_id_array, tennis_ball_detects.class_id, tennis_ball_detects.confidence, tennis_ball_detects.xyxy)
+            ]
+        
+        if box_detects.tracker_id is None:
+            box_tracker_id_array = np.array([])
+        else:
+            box_tracker_id_array = tennis_ball_detects.tracker_id
+
+        box_labels = [
+                f"#{tracker_id} {self.CLASS_NAMES[class_id]} {confidence:0.2f} error: {1/2*(xyxy[0] + xyxy[2]) - self.frame_w/2:0.0f}"
+                for tracker_id, class_id, confidence, xyxy
+                in zip(box_tracker_id_array, box_detects.class_id, box_detects.confidence, box_detects.xyxy)
             ]
 
+        # if detects.tracker_id is None:
+        #     tracker_id_array = np.array([])
+        # else:
+        #     tracker_id_array = detects.tracker_id
+        
+        # labels = []
+        # for i in range(len(tracker_id_array)):
+        #     if detects.class_id[i] == self.TENNIS_BALL_CLS:
+        #         labels.append(f"#{tracker_id_array[i]} {self.CLASS_NAMES[self.TENNIS_BALL_CLS]} {detects.confidence[i]:0.2f} error: {1/2*(detects.xyxy[i][0] + detects.xyxy[i][2]) - self.frame_w/2:0.0f}")
+        #     else:
+        #         labels.append(f'#{tracker_id_array[i]} {self.CLASS_NAMES[detects.class_id[i]]} {detects.confidence[i]:0.2f}')
+        all_lines = []
+        if line_detects.mask is not None and len(line_detects.mask) > 0:
+            print(line_detects.mask)
+            triggered, largest_line, all_lines = self.ld.detect(line_detects.mask)
+
         # Plot the image with bounding boxes
-        if len(labels) == len(filtered_detects):
-            annotated_image = box_annotator.annotate(scene=image_frame, detections=filtered_detects)
-            annotated_image = label_annotator.annotate(scene=annotated_image, detections=filtered_detects, labels=labels)
+        if len(tennis_ball_labels) == len(tennis_ball_detects) and len(box_labels) == len(box_detects):
+            annotated_image = box_annotator.annotate(scene=image_frame, detections=tennis_ball_detects)
+            annotated_image = label_annotator.annotate(scene=annotated_image, detections=tennis_ball_detects, labels=tennis_ball_labels)
+            annotated_image = box_annotator.annotate(scene=annotated_image, detections=box_detects)
+            annotated_image = label_annotator.annotate(scene=annotated_image, detections=box_detects, labels=box_labels)
+            for line in all_lines:
+                annotated_image = cv2.line(annotated_image, (line[0], line[1]), (line[2], line[3]), (0, 255, 0), 2)
             cv2.imshow('annotated_img', annotated_image)
             cv2.waitKey(5) 
 
@@ -128,10 +187,10 @@ class Inference:
         if n_detected_tennis_balls > 0:
 
             # Calculate the errors
-            x = 1/2*(filtered_detects.xyxy[:, 0] + filtered_detects.xyxy[:, 2]) - self.frame_w/2
+            x = 1/2*(tennis_ball_detects.xyxy[:, 0] + tennis_ball_detects.xyxy[:, 2]) - self.frame_w/2
             
             # Calculate the distances
-            dist = self.estimate_distance(filtered_detects.xyxy)
+            dist = self.estimate_distance(tennis_ball_detects.xyxy)
 
             # Target the closest ball
             dist_min_idx = np.argmin(dist)
@@ -188,6 +247,7 @@ class Inference:
 if __name__ == "__main__":
     logging.config.fileConfig('log.conf')
     logger = logging.getLogger(__name__)
-    cap = Inference().start()
+    cap = CameraStream(src='2024-09-07_00-53-32-validation-converted.mp4').start()
+    inf = Inference(cap).start()
     while True:
-        cap.logger.debug(cap.read_plot())
+        inf.logger.debug(inf.read_plot())

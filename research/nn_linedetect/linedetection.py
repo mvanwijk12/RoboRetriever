@@ -106,31 +106,6 @@ class LineDetector:
 
         return triggered, largest_line[0], all_lines  # formerly trig (bin), angle, distance, np array of a and b
 
-def process_video(video_path, model, detector):
-    cap = cv2.VideoCapture(video_path)
-
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        frame_height, frame_width, _ = frame.shape
-        detections = model.predict(frame, classes=1)
-        result = detections[0]
-        masks = result.masks
-
-        if masks is not None:
-            triggered, line, all_lines = detector.detect(masks, orig_img=frame, viz_type=1)
-            print(triggered, line)
-
-        cv2.imshow("Lines", frame)
-
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-    cap.release()
-    cv2.destroyAllWindows()
-
 
 if __name__ == "__main__":
     #logging.config.fileConfig('log.conf')
@@ -154,7 +129,7 @@ if __name__ == "__main__":
                         'image_13-2024-09-13_14-08-15.jpg','image_14-2024-09-13_14-08-15.jpg','image_15-2024-09-13_14-08-15.jpg','image_16-2024-09-13_14-08-15.jpg',
                         'image_17-2024-09-13_14-08-15.jpg','image_18-2024-09-13_14-08-15.jpg','image_19-2024-09-13_14-08-15.jpg','image_20-2024-09-13_14-08-15.jpg']
     
-    current_image_index = 0 # 19
+    current_image_index = 19 # 19
     image_file = folder+image_file_names[current_image_index]
 
     model = YOLO('best.pt')

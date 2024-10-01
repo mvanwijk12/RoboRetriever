@@ -5,7 +5,7 @@ import logging
 import logging.config
 
 class LineDetector:
-    def __init__(self, box_width_ratio=0.9, box_height_ratio=0.25, bottom_offset_ratio=0.05, viz_type=1):
+    def __init__(self, box_width_ratio=0.5, box_height_ratio=0.15, bottom_offset_ratio=0.03, viz_type=1):
         self.box_width_ratio = box_width_ratio
         self.box_height_ratio = box_height_ratio
         self.bottom_offset_ratio = bottom_offset_ratio
@@ -120,7 +120,7 @@ def process_video(video_path, model, detector):
         masks = result.masks
 
         if masks is not None:
-            triggered, line, all_lines = detector.detect(masks, orig_img=frame, viz_type=1)
+            triggered, line, all_lines = detector.detect(masks, orig_img=frame)
             print(triggered, line)
 
         cv2.imshow("Lines", frame)
@@ -131,46 +131,11 @@ def process_video(video_path, model, detector):
     cap.release()
     cv2.destroyAllWindows()
 
-
 if __name__ == "__main__":
-    #logging.config.fileConfig('log.conf')
     logger = logging.getLogger(__name__)
 
-    # folder = "../opencv_tests/court_lines/"
-    # image_file_names = ['20240820_124734.jpg','20240820_124438.jpg','20240820_124447.jpg','20240820_124451.jpg','20240820_124509.jpg','20240820_124511.jpg',
-    #                     '20240820_124521.jpg','20240820_124524.jpg','20240820_124535.jpg','20240820_124539.jpg','20240820_124551.jpg','20240820_124554.jpg',
-    #                     '20240820_124603.jpg','20240820_124612.jpg','20240820_124619.jpg','20240820_124626.jpg','20240820_124701.jpg','20240820_124708.jpg',
-    #                     '20240820_124732.jpg','20240820_124745.jpg','20240820_124802.jpg','20240820_124804.jpg','20240820_124806.jpg','20240820_124808.jpg',
-    #                     '20240820_124810.jpg','20240820_124820.jpg','20240820_124821.jpg','20240820_124826.jpg','20240820_124827.jpg','20240820_124831.jpg',
-    #                     '20240820_124833.jpg','20240820_124835.jpg','20240820_124838.jpg']
-
-    # folder = "../opencv_tests/image_data/"
-    # image_file_names = ['img1.png','img2.png','img3.png','img4.png','img5.png','img6.png','img7.png','img8.png','img9.png','img10.png']
-
-    folder = "../opencv_tests/new_images/"
-    image_file_names = ['image_1-2024-09-13_14-08-15.jpg','image_2-2024-09-13_14-08-15.jpg','image_3-2024-09-13_14-08-15.jpg','image_4-2024-09-13_14-08-15.jpg',
-                        'image_5-2024-09-13_14-08-15.jpg','image_6-2024-09-13_14-08-15.jpg','image_7-2024-09-13_14-08-15.jpg','image_8-2024-09-13_14-08-15.jpg',
-                        'image_9-2024-09-13_14-08-15.jpg','image_10-2024-09-13_14-08-15.jpg','image_11-2024-09-13_14-08-15.jpg','image_12-2024-09-13_14-08-15.jpg',
-                        'image_13-2024-09-13_14-08-15.jpg','image_14-2024-09-13_14-08-15.jpg','image_15-2024-09-13_14-08-15.jpg','image_16-2024-09-13_14-08-15.jpg',
-                        'image_17-2024-09-13_14-08-15.jpg','image_18-2024-09-13_14-08-15.jpg','image_19-2024-09-13_14-08-15.jpg','image_20-2024-09-13_14-08-15.jpg']
-    
-    current_image_index = 0 # 19
-    image_file = folder+image_file_names[current_image_index]
-
+    video_path = "../opencv_tests/videos/2024-09-07_00-49-34-validation-converted.mp4"
     model = YOLO('best.pt')
-    detections = model.predict([image_file], classes=1)  # class 1 is line
-    result = detections[0]
-    masks = result.masks
-
-    visualise = True
-
-    if visualise:
-        detector = LineDetector(viz_type=1)
-        img = result.plot()  # visualise with the bounding boxes and masks
-        #img = cv2.imread(image_file)  # visualise with only the image
-        print(detector.detect(masks, orig_img=img))
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-    else:
-        detector = LineDetector(viz_type=0)
-        print(detector.detect(masks))
+    detector = LineDetector(viz_type=1)
+    
+    process_video(video_path, model, detector)

@@ -5,7 +5,7 @@ import logging
 import logging.config
 
 class LineDetector:
-    def __init__(self, box_width_ratio=0.9, box_height_ratio=0.25, bottom_offset_ratio=0.05, viz_type=1):
+    def __init__(self, box_width_ratio=0.5, box_height_ratio=0.15, bottom_offset_ratio=0.03, viz_type=1):
         self.box_width_ratio = box_width_ratio
         self.box_height_ratio = box_height_ratio
         self.bottom_offset_ratio = bottom_offset_ratio

@@ -74,10 +74,12 @@ class LineDetector:
                 trig_viz = cv2.rectangle(img_resize, top_left, bottom_right, 255, 2)
 
         # Go through all lines
+        all_lines = []
         for line in masks:
             line_mask = np.array(line.data[0])  # 3D array of 1
             trig_amount = self._calc_trigger(line_mask)
             single_line, x_lines = self._calc_single_line(line_mask, frame_height)
+            all_lines.append(x_lines)
 
             # For viz
             line_col = (0, 255, 0)
@@ -102,9 +104,31 @@ class LineDetector:
                     line_viz = cv2.line(img_resize, (x1, y1), (x2, y2), line_col, line_thc)
                 cv2.imshow("Detected Lines with Trigger Box", line_viz)
 
-        return triggered, largest_line[0]  # formerly trig (bin), angle, distance, np array of a and b
+        return triggered, largest_line[0], all_lines  # formerly trig (bin), angle, distance, np array of a and b
 
+def process_video(video_path, model, detector):
+    cap = cv2.VideoCapture(video_path)
 
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        frame_height, frame_width, _ = frame.shape
+        detections = model.predict(frame, classes=1)
+        result = detections[0]
+        masks = result.masks
+
+        if masks is not None:
+            triggered, line, all_lines = detector.detect(masks, orig_img=frame, viz_type=1)
+            print(triggered, line)
+
+        cv2.imshow("Lines", frame)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
 
 if __name__ == "__main__":
     #logging.config.fileConfig('log.conf')
@@ -127,8 +151,11 @@ if __name__ == "__main__":
                         'image_9-2024-09-13_14-08-15.jpg','image_10-2024-09-13_14-08-15.jpg','image_11-2024-09-13_14-08-15.jpg','image_12-2024-09-13_14-08-15.jpg',
                         'image_13-2024-09-13_14-08-15.jpg','image_14-2024-09-13_14-08-15.jpg','image_15-2024-09-13_14-08-15.jpg','image_16-2024-09-13_14-08-15.jpg',
                         'image_17-2024-09-13_14-08-15.jpg','image_18-2024-09-13_14-08-15.jpg','image_19-2024-09-13_14-08-15.jpg','image_20-2024-09-13_14-08-15.jpg']
+    
+    # folder = "../opencv_tests/videos/"
+    # image_file_names = ["2024-09-07_00-49-34-validation-converted.mp4"]
 
-    current_image_index = 0 # 19
+    current_image_index = 19 # 19
     image_file = folder+image_file_names[current_image_index]
 
     model = YOLO('best.pt')
@@ -137,14 +164,14 @@ if __name__ == "__main__":
     masks = result.masks
 
     visualise = False
-    
-    detector = LineDetector(viz_type=0)
 
     if visualise:
+        detector = LineDetector(viz_type=1)
         img = result.plot()  # visualise with the bounding boxes and masks
         #img = cv2.imread(image_file)  # visualise with only the image
         print(detector.detect(masks, orig_img=img))
         cv2.waitKey(0)
         cv2.destroyAllWindows()
     else:
+        detector = LineDetector(viz_type=0)
         print(detector.detect(masks))

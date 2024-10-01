@@ -6,3 +6,5 @@ __pycache__/
 research/opencv_tests/image_data/
 
 research/opencv_tests/new_images/
+
+research/opencv_tests/videos/

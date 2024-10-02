@@ -40,7 +40,6 @@ class LineDetector:
         y2 = np.clip(int(a * x2 + c), 0, frame_height)
 
         return [np.array([a, 1]), (x1, y1, x2, y2)]
-
     
     def _calc_trigger(self, mask):
         indices = np.argwhere(mask == 1)  # coords of 1s

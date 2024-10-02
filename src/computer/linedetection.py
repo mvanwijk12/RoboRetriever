@@ -3,9 +3,10 @@ import numpy as np
 import cv2
 import logging
 import logging.config
+from sklearn.linear_model import RANSACRegressor
 
 class LineDetector:
-    def __init__(self, box_width_ratio=0.9, box_height_ratio=0.25, bottom_offset_ratio=0.05, viz_type=1):
+    def __init__(self, box_width_ratio=0.5, box_height_ratio=0.15, bottom_offset_ratio=0.03, viz_type=1):
         self.box_width_ratio = box_width_ratio
         self.box_height_ratio = box_height_ratio
         self.bottom_offset_ratio = bottom_offset_ratio
@@ -15,14 +16,22 @@ class LineDetector:
         self.box_x_start = None
         self.box_y_start = None
     
-    def _calc_single_line(self, mask, frame_height):
+    def _calc_single_line(self, mask, frame_height, method="least_squares"):
         indices = np.argwhere(mask == 1)  # Just get the 1s
         x_coords = indices[:, 1]  # Cols
         y_coords = indices[:, 0]  # Rows
 
-        # Least squares method to get y=mx+c
-        A = np.vstack([x_coords, np.ones(len(x_coords))]).T
-        a, c = np.linalg.lstsq(A, y_coords, rcond=None)[0]
+        if method == "least_squares":
+            # Least squares method to get y=mx+c
+            A = np.vstack([x_coords, np.ones(len(x_coords))]).T
+            a, c = np.linalg.lstsq(A, y_coords, rcond=None)[0]
+
+        elif method == "ransac":
+            # RANSAC method to get y=mx+c
+            ransac = RANSACRegressor()
+            ransac.fit(x_coords.reshape(-1,1), y_coords)
+            a = ransac.estimator_.coef_[0]  # Slope
+            c = ransac.estimator_.intercept_  # Intercept
 
         # Clip the line to the frame for visualisation
         x1 = np.min(x_coords)
@@ -78,7 +87,7 @@ class LineDetector:
         for line in masks:
             line_mask = np.array(line)  # 3D array of 1
             trig_amount = self._calc_trigger(line_mask)
-            single_line, x_lines = self._calc_single_line(line_mask, frame_height)
+            single_line, x_lines = self._calc_single_line(line_mask, frame_height, "ransac")
             all_lines.append(x_lines)
 
             # For viz
@@ -104,7 +113,7 @@ class LineDetector:
                     line_viz = cv2.line(img_resize, (x1, y1), (x2, y2), line_col, line_thc)
                 cv2.imshow("Detected Lines with Trigger Box", line_viz)
 
-        return triggered, largest_line[0], all_lines  # formerly trig (bin), angle, distance, np array of a and b
+        return triggered, largest_line[0], all_lines
 
 def process_video(video_path, model, detector):
     cap = cv2.VideoCapture(video_path)

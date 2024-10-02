@@ -223,6 +223,23 @@ class Inference:
             msg = dict(error=str(x[dist_min_idx]), stop='False')
             self.logger.info(f'Tennis ball detected: msg = {msg}')
             return msg
+    
+    def _calculate_error_from_centre(self, bbox_xyxy):
+        """ Calculates the error of a bounding box from the vertical centreline of the image """
+        return 1/2*(bbox_xyxy[0] + bbox_xyxy[2]) - self.frame_w/2
+
+    def _plot_detections(self, box_detects, ld_lines, tennis_ball_detects):
+        """ Plots the bboxes of boxes and tennis ball detection, superimposes the line equations """
+        pass
+
+    def _wrap_detections(self, box_detects, ld_lines, tennis_ball_detects):
+        """ Wraps the detection in a format to be sent to robot """
+        pass
+
+    def _process_detections(self, results, conf_lines, conf_tennis_balls, conf_box):
+        """ Function to process the YOLO inference detections. Takes in a YOLO results object and passes it into three
+        supervision Detection objects: lines, boxes and tennis balls. """
+        pass
         
 
     def estimate_distance(self, bboxs, focal_pixel=770, real_world_diameter=67e-3):

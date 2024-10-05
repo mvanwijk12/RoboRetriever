@@ -4,45 +4,103 @@ import cv2
 import logging
 import logging.config
 from sklearn.linear_model import RANSACRegressor
+import torch
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning) # Suppress UserWarning from PyTorch
+# import liblinedetect as lld
+
+__author__ = "John Bui"
+__modified__ = "Matt van Wijk"
+__last_modified__ = "05/10/2024"
 
 class LineDetector:
-    def __init__(self, box_width_ratio=0.5, box_height_ratio=0.15, bottom_offset_ratio=0.03, viz_type=1):
+    def __init__(self, box_width_ratio=0.5, box_height_ratio=0.15, bottom_offset_ratio=0.03, masks_shape=(384, 640)):
+        """ Initialises the LineDetector object
+         
+        Parameters:
+        - box_width_ratio: specifies the width ratio of the trigger box
+        - box_height_ratio: specifies the height ratio of the trigger box
+        - bottom_offset_ratio: speifies the offset ratio of the trigger box from the bottom of the frame
+        - masks_shape: the (height, width) of the court line masks
+        
+        Returns:
+        - None
+        """
         self.box_width_ratio = box_width_ratio
         self.box_height_ratio = box_height_ratio
         self.bottom_offset_ratio = bottom_offset_ratio
-        self.viz_type = viz_type
-        self.box_width = None
-        self.box_height = None
-        self.box_x_start = None
-        self.box_y_start = None
+
+        # Initialise the trigger box
+        self.frame_height, self.frame_width = masks_shape
+        self.box_width = int(self.box_width_ratio * self.frame_width)
+        self.box_height = int(self.box_height_ratio * self.frame_height)
+        self.box_x_start = (self.frame_width - self.box_width) // 2
+        self.box_y_start = int(self.frame_height * (1 - self.bottom_offset_ratio - self.box_height_ratio))
+
+        # Trigger box
+        self.top_left = (self.box_x_start, self.box_y_start)
+        self.bottom_right = (self.box_x_start + self.box_width, self.box_y_start + self.box_height)
     
-    def _calc_single_line(self, mask, frame_height, method="least_squares"):
-        indices = np.argwhere(mask == 1)  # Just get the 1s
+    def _calc_single_line(self, mask, method="least_squares"):
+        """ Performs linear regression of a single mask of a court line.
+         
+        Parameters:
+        - mask: numpy or tensor object containing the segmentation mask of a court line
+        - method: either the string "least_squares" or "ransac", specifies the method of linear regression 
+        
+        Returns:
+        - [direction, (x1, y1, x2, y2)]:
+            - direction is a list of the form [a, b] where a*x + b*y = 0, specifying the direction of the court line
+            - (x1, y1, x2, y2) specifies the coordinates of the end points of the linear regression line
+        """
+        indices = torch.argwhere(mask == 1)  # Just get the 1s
+        indices = torch.tensor(indices, dtype=float)
         x_coords = indices[:, 1]  # Cols
         y_coords = indices[:, 0]  # Rows
 
         if method == "least_squares":
             # Least squares method to get y=mx+c
-            A = np.vstack([x_coords, np.ones(len(x_coords))]).T
-            a, c = np.linalg.lstsq(A, y_coords, rcond=None)[0]
+            one_tensor = torch.ones(len(x_coords)).to('cuda')
+            A = torch.vstack([x_coords, one_tensor]).T
+            a, c = torch.linalg.lstsq(A, y_coords, rcond=None)[0]
 
         elif method == "ransac":
             # RANSAC method to get y=mx+c
-            ransac = RANSACRegressor()
-            ransac.fit(x_coords.reshape(-1,1), y_coords)
-            a = ransac.estimator_.coef_[0]  # Slope
-            c = ransac.estimator_.intercept_  # Intercept
+            x_coords_np = x_coords.cpu().numpy()
+            y_coords_np = y_coords.cpu().numpy()
+            ransac = RANSACRegressor(residual_threshold=5, max_trials=5)
+            ransac.fit(x_coords_np.reshape(-1, 1), y_coords_np)
+            a = torch.tensor(ransac.estimator_.coef_[0])  # Slope
+            c = torch.tensor(ransac.estimator_.intercept_)  # Intercept
+
+            # # Fit RANSAC model
+            # mad = lld.mad_torch(y_coords)
+            # print(mad)
+            # base_model = lld.LinearRegressionTorch()
+            # ransac_model, inlier_mask = lld.ransac_fit(x_coords, y_coords, base_model, min_samples=2, residual_threshold=5, max_trials=15)
+            # a = ransac_model.coef_
+            # c = ransac_model.intercept_
 
         # Clip the line to the frame for visualisation
-        x1 = np.min(x_coords)
-        x2 = np.max(x_coords)
-        y1 = np.clip(int(a * x1 + c), 0, frame_height)
-        y2 = np.clip(int(a * x2 + c), 0, frame_height)
+        x1 = int(torch.min(x_coords).item())
+        x2 = int(torch.max(x_coords).item())
+        y1 = int(torch.clip(a * x1 + c, 0, self.frame_height).item())
+        y2 = int(torch.clip(a * x2 + c, 0, self.frame_height).item())
 
-        return [np.array([a, 1]), (x1, y1, x2, y2)]
+        return [torch.tensor([-a.item(), 1]), (x1, y1, x2, y2)]
     
     def _calc_trigger(self, mask):
-        indices = np.argwhere(mask == 1)  # coords of 1s
+        """ Calculates whether a court line mask is in the trigger box.
+
+        Parameters:
+        - mask: numpy or tensor object containing the segmentation mask of a court line
+
+        Returns:
+        - trig_pro: the proportion of the mask in the trigger box specified as an integer representing the effective
+          area of the mask in the trigger box
+        - None: in the case that the court line does not enter the trigger box 
+        """
+        indices = torch.argwhere(mask == 1)  # coords of 1s
         line_in_box = [
             [x, y] for y, x in indices
             if self.box_x_start <= x <= self.box_x_start + self.box_width and self.box_y_start <= y <= self.box_y_start + self.box_height
@@ -50,7 +108,7 @@ class LineDetector:
 
         if line_in_box:
             trigger_box = mask[self.box_y_start:self.box_y_start + self.box_height, self.box_x_start:self.box_x_start + self.box_width]
-            trig_pro = np.sum(trigger_box == 1)
+            trig_pro = torch.sum(trigger_box == 1)
             return trig_pro
         else:
             return None
@@ -60,60 +118,50 @@ class LineDetector:
         mask_pro = np.sum(mask == 1)
         return "Mask coverage: " + str((mask_pro / (mask_con + mask_pro)) * 100) + "%"
 
-    def detect(self, masks, orig_img=None):
-        # Initialise the trigger box
-        frame_height, frame_width = masks[0].shape
-        self.box_width = int(self.box_width_ratio * frame_width)
-        self.box_height = int(self.box_height_ratio * frame_height)
-        self.box_x_start = (frame_width - self.box_width) // 2
-        self.box_y_start = int(frame_height * (1 - self.bottom_offset_ratio - self.box_height_ratio))
+    def detect(self, masks):
+        """ Approximates the court lines given a YOLO segmentation mask of the court lines.
+         
+        Parameters:
+        - mask: ultralytics.engine.results.Masks object of the segmentation masks of the court lines
 
-        trig_lines = []
-        triggered = False
-        largest_line = [None, None]
-        x_lines = (None, None, None, None)
-
-        # Perform visualisation if given the original image
-        if orig_img is not None:
-            img_resize = cv2.resize(orig_img, (frame_width, frame_height))
-            if self.viz_type == 1:
-                # Add a trigger box
-                top_left = (self.box_x_start, self.box_y_start)
-                bottom_right = (self.box_x_start + self.box_width, self.box_y_start + self.box_height)
-                trig_viz = cv2.rectangle(img_resize, top_left, bottom_right, 255, 2)
+        Returns:
+        - (triggered, largest_line_index, all_lines, directions) where
+            - triggered: is a list of integers between 0 and 2 specifying the status of each court line
+                    - 0: the court line is not in the trigger box
+                    - 1: the court line is in the trigger box but not the dominant line
+                    - 2: the court line is in the trigger box and is the unique dominant line 
+            - largest_line_index: the index of all_lines that contains the unique dominant line (or None if it doesn't exist)
+            - all_lines: list that contains all of the court line equations in the form (x1, y1, x2, y2)
+            - directions: list of the form [a, b] where a*x + b*y = 0, specifying the direction of the court line
+        """
+        all_lines = []
+        directions = []
+        max_prop = 0
+        triggered = [0] * len(masks.data) # 0 -> not triggered, 1 -> triggered, 2 -> dominant triggered
+        largest_line_index = None
 
         # Go through all lines
-        all_lines = []
-        for line in masks:
-            line_mask = np.array(line)  # 3D array of 1
+        for line_i in range(len(masks.data)):
+
+            line = masks.data[line_i]
+            line_mask = line  # 3D array of 1
             trig_amount = self._calc_trigger(line_mask)
-            single_line, x_lines = self._calc_single_line(line_mask, frame_height, "ransac")
+            dir, x_lines = self._calc_single_line(line_mask, "ransac")
             all_lines.append(x_lines)
+            directions.append(dir)
 
-            # For viz
-            line_col = (0, 255, 0)
-            line_thc = 1
+            if trig_amount is not None: # is the line in the trigger box?
+                
+                triggered[line_i] = 1
 
-            if trig_amount is not None:
-                # if the line is in the trigger box
-                triggered = True
-                trig_lines.append((single_line, trig_amount))
-                largest_line = max(trig_lines, key=lambda x: x[1])
+                if trig_amount > max_prop: # check if the line is dominant
+                    max_prop = trig_amount
+                    largest_line_index = line_i
+        
+        if largest_line_index is not None:
+            triggered[largest_line_index] = 2
 
-                # For viz
-                line_col = (0, 0, 255)
-                line_thc = 2
-
-            # Add line as visualisation
-            if orig_img is not None:
-                x1, y1, x2, y2 = x_lines
-                if self.viz_type == 1:
-                    line_viz = cv2.line(trig_viz, (x1, y1), (x2, y2), line_col, line_thc)
-                else:
-                    line_viz = cv2.line(img_resize, (x1, y1), (x2, y2), line_col, line_thc)
-                cv2.imshow("Detected Lines with Trigger Box", line_viz)
-
-        return triggered, largest_line[0], all_lines
+        return triggered, largest_line_index, all_lines, directions
 
 def process_video(video_path, model, detector):
     cap = cv2.VideoCapture(video_path)
@@ -129,7 +177,7 @@ def process_video(video_path, model, detector):
         masks = result.masks
 
         if masks is not None:
-            triggered, line, all_lines = detector.detect(masks, orig_img=frame, viz_type=1)
+            triggered, line, all_lines = detector.detect(masks, orig_img=frame)
             print(triggered, line)
 
         cv2.imshow("Lines", frame)
@@ -175,12 +223,12 @@ if __name__ == "__main__":
     visualise = False
 
     if visualise:
-        detector = LineDetector(viz_type=1)
+        detector = LineDetector()
         img = result.plot()  # visualise with the bounding boxes and masks
         #img = cv2.imread(image_file)  # visualise with only the image
         print(detector.detect(masks, orig_img=img))
         cv2.waitKey(0)
         cv2.destroyAllWindows()
     else:
-        detector = LineDetector(viz_type=0)
+        detector = LineDetector()
         print(detector.detect(masks))

@@ -169,20 +169,20 @@ class Inference:
         - msg: a list of dictionaries containing the inference results from the tennis balls and boxes and the triggered line direction in a dictionary
 
         Example msg object:
-        msg = [{'name': 'tennis ball', 'class': 2, 'confidence': 0.84805, 'box': {'x1': 873.23071, 'y1': 488.5304, 'x2': 904.45947, 'y2': 516.15857}},
-          {'name': 'box', 'class': 0, 'confidence': 0.61668, 'box': {'x1': 921.52319, 'y1': 377.49768, 'x2': 1249.85254, 'y2': 470.74341}},
+        msg = [{'name': 'tennis ball', 'class': 2, 'confidence': 0.84805, 'box': {'x1': 0.68221, 'y1': 0.67851, 'x2': 0.70661, 'y2': 0.71689}},
+          {'name': 'box', 'class': 0, 'confidence': 0.61668, 'box': {'x1': 0.71994, 'y1': 0.52430, 'x2': 0.97645, 'y2': 0.65381}},
             {'line_direction': None}]
 
-        msg = [{'name': 'tennis ball', 'class': 2, 'confidence': 0.90089, 'box': {'x1': 109.82916, 'y1': 535.94666, 'x2': 216.55533, 'y2': 632.59021}},
-          {'name': 'tennis ball', 'class': 2, 'confidence': 0.66197, 'box': {'x1': 82.20343, 'y1': 403.78745, 'x2': 113.4147, 'y2': 418.24826}},
-            {'line_direction': tensor([-0.5857,  1.0000])}]
+        msg = [{'name': 'tennis ball', 'class': 2, 'confidence': 0.90089, 'box': {'x1': 0.08580, 'y1': 0.74437, 'x2': 0.16918, 'y2': 0.87860}},
+          {'name': 'tennis ball', 'class': 2, 'confidence': 0.66197, 'box': {'x1': 0.064221, 'y1': 0.56082, 'x2': 0.08861, 'y2': 0.58090}},
+            {'line_direction': [-0.5857,  1.0000]}]
         """
-        msg = json.loads(tennis_ball_box_detects.tojson())
+        msg = json.loads(tennis_ball_box_detects.tojson(normalize=True))
         
         if ld_lines is not None: # if there is a line detected in the frame
             _, largest_line_index, _, directions = ld_lines
             if largest_line_index is not None: # if the line detected is in the trigger box
-                msg.append(dict(line_direction=directions[largest_line_index]))
+                msg.append(dict(line_direction=directions[largest_line_index].tolist()))
             else:
                 msg.append(dict(line_direction=None))
         else:

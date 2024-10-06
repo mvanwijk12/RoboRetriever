@@ -142,17 +142,17 @@ class Inference:
         - None
         """
         annotated_image = tennis_ball_box_detects.plot()
-        annotated_image = cv2.resize(annotated_image, (self.ld.frame_width, self.ld.frame_height))
-        # top_left = (int(top_left[0] * 1280/640), int(top_left[1] *720/384))
-        # bottom_right = (int(bottom_right[0] * 1280/640), int(bottom_right[1] *720/384))
-        annotated_image = cv2.rectangle(annotated_image, self.ld.top_left, self.ld.bottom_right, (128, 0, 128), 2)
+        # annotated_image = cv2.resize(annotated_image, (self.ld.frame_width, self.ld.frame_height))
+        top_left = (int(self.ld.top_left[0] * 1280/640), int(self.ld.top_left[1] *720/384))
+        bottom_right = (int(self.ld.bottom_right[0] * 1280/640), int(self.ld.bottom_right[1] *720/384))
+        annotated_image = cv2.rectangle(annotated_image, top_left, bottom_right, (128, 0, 128), 2)
         
         if ld_lines is not None:
             colours = [(0, 255, 0), (0, 165, 255), (0, 0, 255)] # BGR format
             triggered, _, all_lines, _ = ld_lines
             for i in range(len(all_lines)):
                 line = all_lines[i]
-                annotated_image = cv2.line(annotated_image, (line[0], line[1]), (line[2], line[3]), colours[triggered[i]], 2)
+                annotated_image = cv2.line(annotated_image, (int(line[0]*1280/1280), int(line[1]*720/720)), (int(line[2]*1280/1280), int(line[3]*720/720)), colours[triggered[i]], 2)
                 # annotated_image = cv2.line(annotated_image, (round(line[0] * 1280/640), round(line[1] * 720/384)), (round(line[2] * 1280/640), round(line[3] * 720/384)), colours[triggered[i]], 2)
 
         cv2.imshow('annotated_img', annotated_image)

@@ -210,7 +210,7 @@ class RobotController:
         while not self.stored_pathway.is_empty():
             lwheel, rwheel = self.stored_pathway.pop()
             self.logger.info(f'backwards: left wheel {round(lwheel, 2)} right wheel {round(rwheel, 2)}')
-            self.robot.relative_drive(distance=self.distance_step, speed=self.speed, scaling_L=lwheel, scaling_R=rwheel) 
+            self.robot.relative_drive(distance=-self.distance_step, speed=self.speed, scaling_L=lwheel, scaling_R=rwheel) 
 
     
 

@@ -141,6 +141,10 @@ class Drive_B:
         """ Takes in the edge speed for one wheel and returns the corresponding PWM frequency"""
         # Edge speed is positive and already limited
         # Traction factor and diameter scaling are applied at this point
+        assert self.traction_factor * self.diameter_scaleL * self.wheel_diameter != 0
+        assert self.traction_factor * self.diameter_scaleR * self.wheel_diameter != 0
+        assert self.stepping_mode != 0
+
         if sideLeft:
             rev_rate = edge_speed / (self.traction_factor * self.diameter_scaleL * self.wheel_diameter)
         else:
@@ -157,6 +161,9 @@ class Drive_B:
         Returns 1 if no speed limiting is needed"""
         # Negative wheel speeds are accepted and should be supplied for sharp turns
         # Speed limiting
+        assert edge_speed_L != 0 
+        assert edge_speed_R != 0
+
         if abs(edge_speed_L) > self.speed_restrict:
             limit_by_speed_L = abs(self.speed_restrict / edge_speed_L)
         else: limit_by_speed_L = 1
@@ -182,11 +189,17 @@ class Drive_B:
         Accepts negative wheel speeds as a reverse instruction """
         # Drive time represents the time value used in the speed and distance calculation,
         # this function accounts for the acceleration curve it makes
+        assert self.acceleration != 0
+        assert edge_speed_L != 0
+        assert edge_speed_R != 0 
 
         self.logger.info(f'Moving with speeds {edge_speed_L} and {edge_speed_R} for {drive_time} s')
         # Apply limits and adjust time to compensate if necessary
         limiting_factor = self.calculate_limits(edge_speed_L, edge_speed_R)
         self.logger.debug(f'Limiting factor applied: {limiting_factor}')
+        
+        assert limiting_factor != 0
+
         edge_speed_L = edge_speed_L * limiting_factor
         edge_speed_R = edge_speed_R * limiting_factor
         drive_time = drive_time / limiting_factor
@@ -272,7 +285,7 @@ class Drive_B:
         if distance >= 0:
             self.execute_drive(drive_time, speed, speed)
         else:
-            self.execute_drive(drive_time, -1 * speed, -1 * speed)
+            self.execute_drive(drive_time, -speed, -speed)
 
 
     def relative_drive(self, distance=1, speed=1, scaling_L=1, scaling_R=1):
@@ -284,7 +297,7 @@ class Drive_B:
         drive_time = abs(distance / speed)
 
         # Scaling is converted so that the base speed is the same after scaling
-        if scaling_L != -1 * scaling_R:
+        if scaling_L != -scaling_R:
             average_scaling = abs((scaling_L + scaling_R) / 2)
             scaling_L = scaling_L / average_scaling
             scaling_R = scaling_R / average_scaling
@@ -295,7 +308,7 @@ class Drive_B:
         if distance >= 0:
             self.execute_drive(drive_time, speed * scaling_L, speed * scaling_R)
         else:
-            self.execute_drive(drive_time, -1 * speed * scaling_L, -1 * speed * scaling_R)
+            self.execute_drive(drive_time, -speed * scaling_L, -speed * scaling_R)
 
 
     def turn_to_distance(self, distance=1, speed=1, radius=1):
@@ -315,7 +328,7 @@ class Drive_B:
         if distance >= 0:
             self.execute_drive(drive_time, speed * scaling_L, speed * scaling_R)
         else:
-            self.execute_drive(drive_time, -1 * speed * scaling_L, -1 * speed * scaling_R)
+            self.execute_drive(drive_time, -speed * scaling_L, -speed * scaling_R)
 
 
     def _turn_to_angle(self, angle, turn_rate, radius):
@@ -329,6 +342,9 @@ class Drive_B:
         # Negative angles for left turn, angle in degrees
         # Radius should be positive or zero
         # turn_rate is the angular velocity in degrees/sec
+        assert self.spacing_scale != 0
+        assert turn_rate != 0
+
         turn_rate = abs(turn_rate)
         radius = abs(radius)
 
@@ -364,7 +380,7 @@ class Drive_B:
         incidence_direction = np.array([1,0])
         normalized_mirror_direction = line/np.linalg.norm(line)
         reflected_direction = incidence_direction - (2*np.dot(incidence_direction, normalized_mirror_direction))*normalized_mirror_direction
-        return reflected_direction/np.linalg.norm(reflected_direction)
+        return reflected_direction/np.linalg.norm(reflected_direction) # TODO: check if reflected_direction can ever be 0
     
     def rebound_off_line(self, line, turn_rate=20, turn_radius=0.1):
         """ Takes in an equation of the mirror line and executes a reflected turn assuming optical dynamics.

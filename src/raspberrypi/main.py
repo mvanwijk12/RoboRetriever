@@ -308,7 +308,7 @@ class RobotController:
         bbox_widths = abs(bbox['x2'] - bbox['x1'])
 
         # Calculate distance using the formula: Distance = (Real Diameter * Focal Length) / Perceived Diameter
-        return np.where(bbox_widths != 0, (real_world_diameter * focal_pixel) / bbox_widths, 1e-5)
+        return np.where(bbox_widths != 0, (real_world_diameter * focal_pixel) / bbox_widths, 1e5)
 
     def main_loop(self):
         """ Entry point of program """

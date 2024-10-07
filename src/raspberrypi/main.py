@@ -96,7 +96,7 @@ class RobotController:
 
         if self.counter > counter_thres:
             # turn right
-            lwheel = 0
+            lwheel = 0.1 # cannot be zero, for divide by zero reasons
             rwheel = 1
             self.counter = (self.counter + 1) % counter_wrap_around
         else:

@@ -140,7 +140,7 @@ class RobotController:
         """ Function to execute the turn away from line state. Used to navigate the robot away
          from the court quadrant boundaries. """
         if 'inf_results' in kwargs:
-            direction = np.array(kwargs['inf_results'][2]['line_direction'])
+            direction = np.array(kwargs['inf_results'][2])
             self.robot.rebound_off_line(direction)
         else:
             raise Exception('Inference results not passed to self.turn_away_from_line')

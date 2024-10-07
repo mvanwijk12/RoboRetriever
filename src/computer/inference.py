@@ -177,7 +177,10 @@ class Inference:
           {'name': 'tennis ball', 'class': 2, 'confidence': 0.66197, 'box': {'x1': 0.064221, 'y1': 0.56082, 'x2': 0.08861, 'y2': 0.58090}},
             {'line_direction': [-0.5857,  1.0000]}]
         """
-        msg = json.loads(tennis_ball_box_detects.tojson(normalize=True))
+        try:
+            msg = json.loads(tennis_ball_box_detects.tojson(normalize=True))
+        except TypeError:
+            return [] # this will cause the system to go into state 0, 8 or 16
         
         if ld_lines is not None: # if there is a line detected in the frame
             _, largest_line_index, _, directions = ld_lines

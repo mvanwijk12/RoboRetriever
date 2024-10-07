@@ -4,8 +4,8 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/e21/RoboRetriever/milestone1/raspberrypi
-ExecStart=/usr/bin/python /home/e21/RoboRetriever/milestone1/raspberrypi/main.py
+WorkingDirectory=/home/e21/RoboRetriever/src/raspberrypi
+ExecStart=/usr/bin/python /home/e21/RoboRetriever/src/raspberrypi/main.py
 Restart=always
 RestartSec=2
 

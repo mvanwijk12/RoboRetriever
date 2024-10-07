@@ -50,39 +50,36 @@ class ConnectionClient:
         ''' Send the detections over the network '''
         # Convert detection dict to encoded dictionary
         request = self._create_request(detections)
-        message = libclient.Message(self.sock, (self.host, self.port), request)
-        
-        try:
-            # This will send all the None
-            message.write()
-
-        except Exception as e:
-            for i in range(self.MAX_RECONNECTION_ATTEMPTS):
-                try:
-                    # Try to reconnect
-                    self.logger.error(f"Error: {e}. Attempting to reconnect...")
-                    sock.close()
-
-                    start_time = time.time()
-                    while time.time() - start_time < 3: # Wait before reconnecting
-                        pass  
-
-                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    self.sock.setblocking(False)
+        retry_attempt = False
+        success = False
+        for i in range(self.MAX_RECONNECTION_ATTEMPTS):
+            try:
+                if retry_attempt:
+                    self.logger.debug("About to attempt to reconnect...")
                     self.sock.connect_ex((self.host, self.port))
+                    time.sleep(3)
                     self.logger.info("Reconnected to server.")
-                    message.write()
 
-                except Exception as e:
-                    self.logger.error(f"Attempt {i + 1}/{self.MAX_RECONNECTION_ATTEMPTS} Failed to reconnect: {e}")
-                    
-                else:
-                    break
-            else:
-                self.logger.error('Max reconnection attempts reached. Exiting...')
-                self.close()
-                sys.exit()
+                # This will send all the None
+                message = libclient.Message(self.sock, (self.host, self.port), request)
+                self.logger.debug("About to attempt to send...")
+                message.write()
+                success = True
 
+            except Exception as e:
+                
+                # Try to reconnect
+                retry_attempt = True
+                self.logger.error(f"Error: {e}. Attempt {i + 1}/{self.MAX_RECONNECTION_ATTEMPTS} to reconnect...")
+                self.sock.close()
+                self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.sock.setblocking(False)
+                time.sleep(3)
+
+        if not success:
+            self.logger.error('Max reconnection attempts reached. Exiting...')
+            self.close()
+            sys.exit()
         
 
 if __name__ == "__main__":
@@ -93,12 +90,12 @@ if __name__ == "__main__":
     logger = logging.getLogger(__name__)
     con = ConnectionClient(hostname=HOSTNAME)
     cs_stream = cs.CameraStream(src=f'tcp://{HOSTNAME}:8554').start()
-    res = Inference(cs_stream).start()
-    trag = Tragectory(cs_stream).start()
+    res = Inference(cs_stream, model_path='tennis_court2.pt').start()
+    
     while True:
-        trag.read_reflect_trag()
+        
         detections = res.read_plot()
         con.send_detections(detections)
-        time.sleep(0.5)
+        time.sleep(0.1)
 
 

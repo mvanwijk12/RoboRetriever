@@ -219,60 +219,77 @@ class Drive_B:
         edge_speed_R = abs(edge_speed_R)
         self.logger.debug(f'Drive direction set, speeds are now {round(edge_speed_L, 2)} and {round(edge_speed_R, 2)}')
         
+        # Use the fastest edge wheel for the acceleration curve
+        if edge_speed_L > edge_speed_R:
+            acc_target_speed = edge_speed_L
+            acc_left_controlled = True
+        else:
+            acc_target_speed = edge_speed_R
+            acc_left_controlled = False
+
         # Estimates for acceleration and constant speed drive time
-        acceleration_time = edge_speed_L / self.acceleration
+        acceleration_time = acc_target_speed / self.acceleration
         straight_time = drive_time - acceleration_time # The average speed in acceleration is half, but there are two time periods
         self.logger.debug(f'Accelerate for {round(acceleration_time, 2)}s and drive for {round(straight_time, 2)} s')
 
-        # TODO: Apply the acceleration to the average speed of the robot, not to one wheel
-        # TODO: Divide the distance test into three regions, slow moves over short distance and accelerate/decelerate for moderate distance
-
-        # If no room, perform the drive slowly
+        # If no room, accelerate for half the distance then slow down
         if straight_time < 0:
-            self.logger.debug(f'Moving {round(edge_speed_L * drive_time, 2)}m slowly as no room to accelerate')
-            reduction = 0.05 / edge_speed_L
-            drive_time = drive_time / reduction
-            edge_speed_L = 0.05
-            edge_speed_R = reduction * edge_speed_R
-            step_rate_L = self.convert_speed_PWM_rate(edge_speed_L, True)
-            step_rate_R = self.convert_speed_PWM_rate(edge_speed_R, False)
-            self.set_drive_PWM(step_rate_L, step_rate_R, drive_time)
-            self.all_stop()
+            self.logger.debug(f'Not enough distance to accelerate to target speed')
+            acc_total_distance = acc_target_speed * drive_time
+            # Use v^2=2as for s being half the total distance
+            acc_target_speed = math.sqrt(abs(self.acceleration * acc_total_distance))
+            straight_time = 0
 
-        else:
-            # Constant acceleration loop
-            speed_ratio = edge_speed_R / edge_speed_L
-            # Apply the target acceleration rate to the left wheel speed
-            current_speed_L = 0
-            self.logger.debug(f'Accelerating at {round(self.acceleration, 2)}m/s^2')
-            while current_speed_L < edge_speed_L:
+        # Constant acceleration loop
+        speed_ratio = edge_speed_R / edge_speed_L # Always right/left
+        # Apply the target acceleration rate to the left wheel speed
+        acc_current_speed = 0
+        current_speed_L = 0
+        current_speed_R = 0
+        self.logger.debug(f'Accelerating at {round(self.acceleration, 2)}m/s^2')
+        while acc_current_speed < acc_target_speed:
+            if acc_left_controlled:
                 current_speed_L += self.acceleration * self.acceleration_time_step
                 current_speed_R = current_speed_L * speed_ratio
-                step_rate_L = self.convert_speed_PWM_rate(current_speed_L, True)
-                step_rate_R = self.convert_speed_PWM_rate(current_speed_R, False)
-                self.set_drive_PWM(step_rate_L, step_rate_R, self.acceleration_time_step)
+            else:
+                current_speed_R += self.acceleration * self.acceleration_time_step
+                current_speed_L = current_speed_R / speed_ratio
+            
+            step_rate_L = self.convert_speed_PWM_rate(current_speed_L, True)
+            step_rate_R = self.convert_speed_PWM_rate(current_speed_R, False)
+            self.set_drive_PWM(step_rate_L, step_rate_R, self.acceleration_time_step)
 
-            # Constant acceleration allows the calculation that the distance travelled in accelerating
-            # is half that that would be travelled at the target speed in the same time, allowing for the 
-            # braking loop later means taking these values and subtracting them from the drive time
+        # Constant acceleration allows the calculation that the distance travelled in accelerating
+        # is half that that would be travelled at the target speed in the same time, allowing for the 
+        # braking loop later means taking these values and subtracting them from the drive time
 
-            # Drive most of the distance
+        # Drive most of the distance
+        if straight_time > 0:
             self.logger.debug(f'Driving at constant speed for {round(straight_time, 2)} s')
             step_rate_L = self.convert_speed_PWM_rate(edge_speed_L, True)
             step_rate_R = self.convert_speed_PWM_rate(edge_speed_R, False)
             self.set_drive_PWM(step_rate_L, step_rate_R, straight_time)
 
-            # Constant deceleration loop
-            current_speed_L = edge_speed_L
-            self.logger.debug(f'Decelerating at {round(self.acceleration, 2)}m/s^2')
-            while current_speed_L > 0:
+        # Constant deceleration loop
+        if acc_left_controlled:
+            acc_current_speed = edge_speed_L
+        else:
+            acc_current_speed = edge_speed_R
+        
+        self.logger.debug(f'Decelerating at {round(self.acceleration, 2)}m/s^2')
+        while acc_current_speed > 0:
+            if acc_left_controlled:
                 current_speed_L -= self.acceleration * self.acceleration_time_step
                 current_speed_R = current_speed_L * speed_ratio
-                step_rate_L = self.convert_speed_PWM_rate(current_speed_L, True)
-                step_rate_R = self.convert_speed_PWM_rate(current_speed_R, False)
-                self.set_drive_PWM(step_rate_L, step_rate_R, self.acceleration_time_step)
+            else:
+                current_speed_R -= self.acceleration * self.acceleration_time_step
+                current_speed_L = current_speed_R / speed_ratio
 
-            self.all_stop()
+            step_rate_L = self.convert_speed_PWM_rate(current_speed_L, True)
+            step_rate_R = self.convert_speed_PWM_rate(current_speed_R, False)
+            self.set_drive_PWM(step_rate_L, step_rate_R, self.acceleration_time_step)
+
+        self.all_stop()
 
 
     def straight_drive(self, distance=1, speed=1):

@@ -243,7 +243,8 @@ class RobotController:
         for obj in msg:
             try:
                 name = obj["name"]
-                if name == 'tennis ball':
+                if name == 'tennis-ball':
+                    self.logger.info('TENNIS_BALL!!')
                     if self.bbox_area(obj["box"]) > A_max_tennis_ball:
                         A_max_tennis_ball = self.bbox_area(obj["box"])
                         tennis_ball_obj = obj
@@ -281,8 +282,14 @@ class RobotController:
         - System state as an integer between 0 and 16 (inclusive)
         """
         bit0 = inf_results[1] is not None
+        if bit0:
+            self.logger.info(f'box detected, bit0 set high')
         bit1 = inf_results[2] is not None
+        if bit1:
+            self.logger.info(f'line detected, bit1 set high')
         bit2 = inf_results[0] is not None
+        if bit2:
+            self.logger.info(f'tennis ball detected, bit2 set high')
         bit3 = (time.time() - self.task_start_time >= self.MAX_TASK_TIME_S) or (self.robot.n_collected_balls >= self.MAX_BALLS)
         bit4 = self.robot.reached_box
 

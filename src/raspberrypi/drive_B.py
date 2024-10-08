@@ -180,7 +180,7 @@ class Drive_B:
         else:
             limit_by_turn = 1
         
-        self.logger.debug(f'Limiting factors: speed_L: {limit_by_speed_L}, speed_R: {limit_by_speed_R}, turn_rate: {limit_by_turn}')
+        self.logger.debug(f'Limiting factors: speed_L: {round(limit_by_speed_L, 2)}, speed_R: {round(limit_by_speed_R, 2)}, turn_rate: {round(limit_by_turn, 2)}')
         return (min(limit_by_speed_L, limit_by_speed_R, limit_by_turn))
 
 
@@ -193,10 +193,10 @@ class Drive_B:
         assert edge_speed_L != 0
         assert edge_speed_R != 0 
 
-        self.logger.info(f'Moving with speeds {edge_speed_L} and {edge_speed_R} for {drive_time} s')
+        self.logger.info(f'Moving with speeds {round(edge_speed_L, 2)} and {round(edge_speed_R, 2)} for {round(drive_time, 2)} s')
         # Apply limits and adjust time to compensate if necessary
         limiting_factor = self.calculate_limits(edge_speed_L, edge_speed_R)
-        self.logger.debug(f'Limiting factor applied: {limiting_factor}')
+        self.logger.debug(f'Limiting factor applied: {round(limiting_factor, 2)}')
         
         assert limiting_factor != 0
 
@@ -217,19 +217,19 @@ class Drive_B:
         # Convert edge speeds to absolute values once the direction has been set
         edge_speed_L = abs(edge_speed_L)
         edge_speed_R = abs(edge_speed_R)
-        self.logger.debug(f'Drive direction set, speeds are now {edge_speed_L} and {edge_speed_R}')
+        self.logger.debug(f'Drive direction set, speeds are now {round(edge_speed_L, 2)} and {round(edge_speed_R, 2)}')
         
         # Estimates for acceleration and constant speed drive time
         acceleration_time = edge_speed_L / self.acceleration
         straight_time = drive_time - acceleration_time # The average speed in acceleration is half, but there are two time periods
-        self.logger.debug(f'Accelerate for {acceleration_time} s and drive for {straight_time} s')
+        self.logger.debug(f'Accelerate for {round(acceleration_time, 2)}s and drive for {round(straight_time, 2)} s')
 
         # TODO: Apply the acceleration to the average speed of the robot, not to one wheel
         # TODO: Divide the distance test into three regions, slow moves over short distance and accelerate/decelerate for moderate distance
 
         # If no room, perform the drive slowly
         if straight_time < 0:
-            self.logger.debug(f'Moving {edge_speed_L * drive_time} m slowly as no room to accelerate')
+            self.logger.debug(f'Moving {round(edge_speed_L * drive_time, 2)}m slowly as no room to accelerate')
             reduction = 0.05 / edge_speed_L
             drive_time = drive_time / reduction
             edge_speed_L = 0.05
@@ -244,7 +244,7 @@ class Drive_B:
             speed_ratio = edge_speed_R / edge_speed_L
             # Apply the target acceleration rate to the left wheel speed
             current_speed_L = 0
-            self.logger.debug(f'Accelerating at {self.acceleration} m/s^2')
+            self.logger.debug(f'Accelerating at {round(self.acceleration, 2)}m/s^2')
             while current_speed_L < edge_speed_L:
                 current_speed_L += self.acceleration * self.acceleration_time_step
                 current_speed_R = current_speed_L * speed_ratio
@@ -257,14 +257,14 @@ class Drive_B:
             # braking loop later means taking these values and subtracting them from the drive time
 
             # Drive most of the distance
-            self.logger.debug(f'Driving at constant speed for {straight_time} s')
+            self.logger.debug(f'Driving at constant speed for {round(straight_time, 2)} s')
             step_rate_L = self.convert_speed_PWM_rate(edge_speed_L, True)
             step_rate_R = self.convert_speed_PWM_rate(edge_speed_R, False)
             self.set_drive_PWM(step_rate_L, step_rate_R, straight_time)
 
             # Constant deceleration loop
             current_speed_L = edge_speed_L
-            self.logger.debug(f'Decelerating at {self.acceleration} m/s^2')
+            self.logger.debug(f'Decelerating at {round(self.acceleration, 2)}m/s^2')
             while current_speed_L > 0:
                 current_speed_L -= self.acceleration * self.acceleration_time_step
                 current_speed_R = current_speed_L * speed_ratio
@@ -281,7 +281,7 @@ class Drive_B:
         # Speed limiting is applied later
         speed = abs(speed)
         drive_time = abs(distance / speed)
-        self.logger.info(f'Driving straight {distance} m at {speed} m/s')
+        self.logger.info(f'Driving straight {round(distance, 2)}m at {round(speed, 2)}m/s')
         if distance >= 0:
             self.execute_drive(drive_time, speed, speed)
         else:
@@ -304,7 +304,7 @@ class Drive_B:
             # in other case,
             # the scalings are only of opposite sign, so the result should be that the base speed is the same
 
-        self.logger.info(f'Driving {distance} m, left wheel speed: {speed * scaling_L}, right wheel speed: {speed * scaling_R}')
+        self.logger.info(f'Driving {round(distance, 2)} m, left wheel speed: {round(speed * scaling_L, 2)}, right wheel speed: {round(speed * scaling_R, 2)}')
         if distance >= 0:
             self.execute_drive(drive_time, speed * scaling_L, speed * scaling_R)
         else:
@@ -324,7 +324,7 @@ class Drive_B:
         if radius != 0:
             scaling_R = 1 - distance_difference_per_360 / (2 * 2 * math.pi * radius)
             scaling_L = 1 + distance_difference_per_360 / (2 * 2 * math.pi * radius)
-            self.logger.info(f'Driving {distance} m around arc of {radius} m radius')
+            self.logger.info(f'Driving {round(distance, 2)}m around arc of {round(radius, 2)}m radius')
         if distance >= 0:
             self.execute_drive(drive_time, speed * scaling_L, speed * scaling_R)
         else:
@@ -357,8 +357,8 @@ class Drive_B:
             drive_time = abs(angle / turn_rate)
             speed_L = distance_L / drive_time
             speed_R = distance_R / drive_time
-            self.logger.info(f'Turning {angle} degrees at {turn_rate} degrees/second by driving {average_distance} m around a {radius} m circle')
-            self.logger.debug(f'Wheel speeds are left: {speed_L}, right: {speed_R}')
+            self.logger.info(f'Turning {round(angle, 2)}degrees at {round(turn_rate, 2)}degrees/second by driving {round(average_distance, 2)}m around a {round(radius, 2)}m circle')
+            self.logger.debug(f'Wheel speeds are left: {round(speed_L, 2)}, right: {round(speed_R, 2)}')
             self.execute_drive(drive_time, speed_L, speed_R)
 
 
@@ -391,7 +391,7 @@ class Drive_B:
         """
         # Calculate reflected direction
         reflect_dir = self._reflection_line(line)
-        self.logger.debug(f'Reflected line is {reflect_dir[0]}x + {reflect_dir[1]}y = 0')
+        self.logger.debug(f'Reflected line is {round(reflect_dir[0], 2)}x + {round(reflect_dir[1], 2)}y = 0')
 
         # Calculate turn angle
         turn_angle = self._reflect_line_to_angle(reflect_dir)

@@ -183,8 +183,8 @@ class RobotController:
         lwheel, rwheel = self.controller.homing_multiplier(PIDout)
 
         # Take reciprocal of wheel velocity to avoid box
-        lwheel = 1/lwheel
-        rwheel = 1/rwheel
+        lwheel = np.where(lwheel == 0, 1, 1/lwheel)
+        rwheel = np.where(rwheel == 0, 1, 1/rwheel)
 
         # Save the multiplier for both wheels together, used for reversing
         self.stored_pathway.push([lwheel, rwheel])

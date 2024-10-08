@@ -28,6 +28,8 @@ class Message:
         try:
             # Should be ready to read
             data = self.sock.recv(4096)
+            self.logger.info(f'receieved {len(data)} bytes...')
+            #data = (1).to_bytes()
         except BlockingIOError:
             # Resource temporarily unavailable (errno EWOULDBLOCK)
             pass
@@ -60,8 +62,7 @@ class Message:
                 self.process_jsonheader()
 
         if self.jsonheader:
-            if self.request is None:
-                return self.process_request()
+            return self.process_request()
 
     def close(self):
         self.logger.info(f"Closing connection to {self.addr}")
@@ -108,24 +109,24 @@ class Message:
     def process_request(self):
         content_len = self.jsonheader["content-length"]
         if not len(self._recv_buffer) >= content_len:
-            return
+            return None
         data = self._recv_buffer[:content_len]
         self._recv_buffer = self._recv_buffer[content_len:]
         if self.jsonheader["content-type"] == "text/json":
             encoding = self.jsonheader["content-encoding"]
-            request = self._json_decode(data, encoding)
-            self.logger.debug(f"Received request {request!r} from {self.addr}")
+            self.request = self._json_decode(data, encoding)
+            self.logger.info(f"Received request {self.request} from {self.addr}")
             
             # Setup for next read
             self._jsonheader_len = None
             self.jsonheader = None
-            
-        else:
+            return self.request
+        # else:
             # Binary or unknown content-type
-            self.request = data
-            self.logger.debug(
-                f"Received {self.jsonheader['content-type']} "
-                f"request from {self.addr}"
-            )
+            # self.request = data
+            # self.logger.debug(
+            #     f"Received {self.jsonheader['content-type']} "
+            #     f"request from {self.addr}"
+            # )
 
-        return request
+        # return self.request

@@ -49,17 +49,17 @@ class Drive_B:
         self.traction_factor = 1
         self.steps_per_rev = 200
         self.stepping_mode = 1/8 # Assume 1/8 stepping
-        self.wheel_spacing = 0.287 # Measured distance between inside contact points of wheels in m
+        self.wheel_spacing = 0.230 # Measured distance between inside contact points of wheels in m
 
         # Scaling factors to calibrate the driving accuracy
         self.diameter_scaleL = 1 # scaling factor for left wheel diameter
         self.diameter_scaleR = 1 # scaling factor for right wheel diameter
-        self.spacing_scale = 0.9839 # scaling factor for wheel spacing
+        self.spacing_scale = 1 # scaling factor for wheel spacing
 
         # Speed and acceleration parameters
         self.speed_restrict = 0.2 # speed restriction due to motor behaviour in week 7 lab
-        self.turn_rate_retrict = 90 # Turn rate limit in deg/s
-        self.acceleration = 0.1 # value in ms^-2
+        self.turn_rate_retrict = 45 # Turn rate limit in deg/s
+        self.acceleration = 0.05 # value in ms^-2
         self.acceleration_time_step = 0.02 # number of seconds between speed updates
 
         self.start_time = None

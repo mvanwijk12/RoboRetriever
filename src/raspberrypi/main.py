@@ -281,17 +281,26 @@ class RobotController:
         Returns:
         - System state as an integer between 0 and 16 (inclusive)
         """
+        # Refer to state machine doc
         bit0 = inf_results[1] is not None
         if bit0:
-            self.logger.info(f'box detected, bit0 set high')
+            self.logger.info(f'BOX DETECTED, bit0 set high')
+        
         bit1 = inf_results[2] is not None
         if bit1:
-            self.logger.info(f'line detected, bit1 set high')
+            self.logger.info(f'LINE DETECTED bit1 set high')
+        
         bit2 = inf_results[0] is not None
         if bit2:
-            self.logger.info(f'tennis ball detected, bit2 set high')
+            self.logger.info(f'TENNIS BALL DETECTED, bit2 set high')
+        
         bit3 = (time.time() - self.task_start_time >= self.MAX_TASK_TIME_S) or (self.robot.n_collected_balls >= self.MAX_BALLS)
+        if bit3:
+            self.logger.info(f'STOP CONDITION REACHED, bit3 set high')
+
         bit4 = self.robot.reached_box
+        if bit4:
+            self.logger.info(f'REACHED BOX, bit4 set high')
 
         if not bit3: # if bit3 is 0, we don't care about bit4
             state = bit2 * 2**2 + bit1 * 2**1 + bit0 * 2**0

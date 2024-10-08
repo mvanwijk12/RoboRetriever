@@ -70,12 +70,12 @@ class RobotController:
         - A function handle to that will execute the current system state
         """
 
-        STATE_FUNCTION_MAP_LIST = [self.search_pattern, self.navigate_around_box, self.turn_away_from_line, self.turn_away_from_line, 
+        STATE_FUNCTION_MAP_LIST = [self.search_pattern, self.search_pattern, self.turn_away_from_line, self.turn_away_from_line, 
                             self.drive_towards_ball, self.drive_towards_ball, self.turn_away_from_line, self.turn_away_from_line, 
                             self.search_pattern, self.drive_towards_box, self.turn_away_from_line, self.drive_towards_box, 
                             self.search_pattern, self.drive_towards_box, self.turn_away_from_line, self.drive_towards_box, self.deposition]
         
-        STATE_FUNCTION_MAP_LIST_NAME = ['search_pattern', 'navigate_around_box', 'turn_away_from_line', 'turn_away_from_line', 
+        STATE_FUNCTION_MAP_LIST_NAME = ['search_pattern', 'search_pattern', 'turn_away_from_line', 'turn_away_from_line', 
                             'drive_towards_ball', 'drive_towards_ball', 'turn_away_from_line', 'turn_away_from_line', 
                             'search_pattern', 'drive_towards_box', 'turn_away_from_line', 'drive_towards_box', 
                             'search_pattern', 'drive_towards_box', 'turn_away_from_line', 'drive_towards_box', 'self.deposition']

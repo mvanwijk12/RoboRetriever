@@ -52,7 +52,9 @@ class ConnectionClient:
         request = self._create_request(detections)
         retry_attempt = False
         success = False
-        for i in range(self.MAX_RECONNECTION_ATTEMPTS):
+        attempt_i = 0
+        # while unsuccess send and attemps < MAX:
+        while not success and attempt_i < self.MAX_RECONNECTION_ATTEMPTS:
             try:
                 if retry_attempt:
                     self.logger.debug("About to attempt to reconnect...")
@@ -62,7 +64,7 @@ class ConnectionClient:
 
                 # This will send all the None
                 message = libclient.Message(self.sock, (self.host, self.port), request)
-                self.logger.debug("About to attempt to send...")
+                # self.logger.debug("About to attempt to send...")
                 message.write()
                 success = True
 
@@ -70,7 +72,8 @@ class ConnectionClient:
                 
                 # Try to reconnect
                 retry_attempt = True
-                self.logger.error(f"Error: {e}. Attempt {i + 1}/{self.MAX_RECONNECTION_ATTEMPTS} to reconnect...")
+                attempt_i += 1
+                self.logger.error(f"Error: {e}. Attempt {attempt_i}/{self.MAX_RECONNECTION_ATTEMPTS} to reconnect...")
                 self.sock.close()
                 self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 self.sock.setblocking(False)
@@ -90,12 +93,17 @@ if __name__ == "__main__":
     logger = logging.getLogger(__name__)
     con = ConnectionClient(hostname=HOSTNAME)
     cs_stream = cs.CameraStream(src=f'tcp://{HOSTNAME}:8554').start()
+    # cs_stream = cs.CameraStream(src='2024-09-28_16-01-10-validation-converted.mp4', video_file_fps=30).start()
+    # cs_stream = cs.CameraStream(src='video1-converted.mp4', video_file_fps=30).start()
     res = Inference(cs_stream, model_path='tennis_court2.pt').start()
-    
+    # attempt_i = 0
     while True:
         
         detections = res.read_plot()
+        # detections[-1]['line_detection'] = attempt_i
+        # attempt_i += 1
+        # logger.info(f'sending detections = {detections}')
         con.send_detections(detections)
-        time.sleep(0.1)
+        time.sleep(0.5)
 
 

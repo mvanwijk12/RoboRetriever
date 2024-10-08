@@ -40,18 +40,20 @@ class ConnectionServer:
     def message_update(self):
         try:
             while not self.stop:
-                events = self.sel.select(timeout=1)
+                events = self.sel.select()
                 for key, mask in events:
                     if key.data is None: # Initial
                         self.accept_wrapper(key.fileobj)
                     else:
                         message = key.data
                         try:
-                            self.msg = message.process_events(mask)
-                        
-                            with self.condition:
-                                self.msg_ready = True
-                                self.condition.notify_all()
+                            # process_events returns msg if complete otherwise None
+                            res = message.process_events(mask)
+                            if res is not None:
+                                self.msg = res
+                                with self.condition:
+                                    # self.msg_ready = True
+                                    self.condition.notify_all()
                         except Exception:
                             self.logger.error(
                                 f"Main: Error: Exception for {message.addr}:\n"
@@ -66,17 +68,17 @@ class ConnectionServer:
 
     def get_message(self):
         try:
-            success = False
-            while not success and not self.msg_ready:
-                with self.condition:
-                    success = self.condition.wait(timeout=1)
+            # success = False
+            # while not success and not self.msg_ready:
+            with self.condition:
+                self.condition.wait()
         except: # catch all exceptions including KeyboardInterrupt
             self.logger.error(f"Main: Error: Exception for {traceback.format_exc()}")
             self.close()
             raise Exception
         else:
             self.logger.debug('new msg received')
-            self.msg_ready = False 
+            # self.msg_ready = False 
             return self.msg
 
     def close(self):

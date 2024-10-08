@@ -75,6 +75,7 @@ class RobotController:
                             self.search_pattern, self.drive_towards_box, self.turn_away_from_line, self.drive_towards_box, 
                             self.search_pattern, self.drive_towards_box, self.turn_away_from_line, self.drive_towards_box, self.deposition]
         
+        self.logger.info(f'Executing state function {STATE_FUNCTION_MAP_LIST[state]}...')
         return STATE_FUNCTION_MAP_LIST[state]
 
 
@@ -290,6 +291,8 @@ class RobotController:
                 state = 16
             else:
                 state = bit3 * 2**3 + bit2 * 2**2 + bit1 * 2**1 + bit0 * 2**0
+
+        self.logger.info(f'Entering system state {state}...')
         return state
     
     def estimate_distance(self, bbox, focal_pixel=770/1280, real_world_diameter=67e-3):

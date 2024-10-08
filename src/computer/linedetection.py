@@ -206,8 +206,10 @@ class LineDetector:
 
         # Go through all lines
         for line_i in range(len(masks)):
-
+            
             line = masks[line_i].xy[0]
+            if line.shape[0] == 0 or line.shape[1] != 2:
+                continue
             # line_mask = line  # 3D array of 1
             trig_amount = self._calc_trigger(line)
             dir, x_lines = self._calc_single_line(line, "ransac")

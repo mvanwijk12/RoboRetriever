@@ -54,7 +54,7 @@ class Drive_B:
         # Scaling factors to calibrate the driving accuracy
         self.diameter_scaleL = 1 # scaling factor for left wheel diameter
         self.diameter_scaleR = 1 # scaling factor for right wheel diameter
-        self.spacing_scale = 1 # scaling factor for wheel spacing
+        self.spacing_scale = 1.034 # scaling factor for wheel spacing
 
         # Speed and acceleration parameters
         self.speed_restrict = 0.2 # speed restriction due to motor behaviour in week 7 lab

@@ -232,6 +232,7 @@ class RobotController:
             - box_obj: dictionary (or None) containing the inference results of the largest detected box
             - line_direction: list (or None) of the form [a, b] where a*x + b*y = 0, specifying the direction of the unique dominant court line
         """
+        #self.logger.debug(f'Received msg={msg}')
         A_max_tennis_ball = 0
         A_max_box = 0
 
@@ -240,20 +241,22 @@ class RobotController:
         line_direction = None
         inf_results = [None, None, None]
 
-        for obj in msg:
-            try:
-                name = obj["name"]
-                if name == 'tennis-ball':
-                    self.logger.info('TENNIS_BALL!!')
-                    if self.bbox_area(obj["box"]) > A_max_tennis_ball:
-                        A_max_tennis_ball = self.bbox_area(obj["box"])
-                        tennis_ball_obj = obj
-                else: # name == 'box'
-                    if self.bbox_area(obj["box"]) > A_max_box:
-                        A_max_box = self.bbox_area(obj["box"])
-                        box_obj = obj
-            except KeyError: # line_direction
-                line_direction = obj["line_direction"]
+        if msg is not None:
+            for obj in msg:
+                try:
+                    name = obj["name"]
+                    if name == 'tennis-ball': 
+                        if self.bbox_area(obj["box"]) > A_max_tennis_ball:
+                            A_max_tennis_ball = self.bbox_area(obj["box"])
+                            tennis_ball_obj = obj
+                    else: # name == 'box'
+                        if self.bbox_area(obj["box"]) > A_max_box:
+                            A_max_box = self.bbox_area(obj["box"])
+                            box_obj = obj
+                except KeyError: # line_direction
+                    if obj["line_direction"] is not None:
+                        line_direction = obj["line_direction"]
+                        self.logger.info(f'LINE DETECTED with DIR={line_direction}!!!!!!!!!!!!!!')
 
         inf_results[0] = tennis_ball_obj
         inf_results[1] = box_obj
@@ -343,7 +346,7 @@ class RobotController:
                 inf_results = self.parse_message(x)
                 state = self.determine_state(inf_results)
                 fn_hdle = self.state_function_map(state)
-                fn_hdle(inf_results=inf_results)
+                #fn_hdle(inf_results=inf_results)
             
             except: # catch all exceptions including KeyboardInterrupt
                 # terminate gracefully

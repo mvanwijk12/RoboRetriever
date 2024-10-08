@@ -223,9 +223,11 @@ class Drive_B:
         if edge_speed_L > edge_speed_R:
             acc_target_speed = edge_speed_L
             acc_left_controlled = True
+            self.logger.debug(f'Using left wheel for acceleration curve')
         else:
             acc_target_speed = edge_speed_R
             acc_left_controlled = False
+            self.logger.debug(f'Using right wheel for acceleration curve')
 
         # Estimates for acceleration and constant speed drive time
         acceleration_time = acc_target_speed / self.acceleration
@@ -242,17 +244,18 @@ class Drive_B:
 
         # Constant acceleration loop
         speed_ratio = edge_speed_R / edge_speed_L # Always right/left
-        # Apply the target acceleration rate to the left wheel speed
+        # Apply the target acceleration rate to the fastest wheel, then use the ratio for the slower wheel
         acc_current_speed = 0
         current_speed_L = 0
         current_speed_R = 0
         self.logger.debug(f'Accelerating at {round(self.acceleration, 2)}m/s^2')
         while acc_current_speed < acc_target_speed:
+            acc_current_speed += self.acceleration * self.acceleration_time_step
             if acc_left_controlled:
-                current_speed_L += self.acceleration * self.acceleration_time_step
+                current_speed_L = acc_current_speed
                 current_speed_R = current_speed_L * speed_ratio
             else:
-                current_speed_R += self.acceleration * self.acceleration_time_step
+                current_speed_R = acc_current_speed
                 current_speed_L = current_speed_R / speed_ratio
             
             step_rate_L = self.convert_speed_PWM_rate(current_speed_L, True)
@@ -271,18 +274,16 @@ class Drive_B:
             self.set_drive_PWM(step_rate_L, step_rate_R, straight_time)
 
         # Constant deceleration loop
-        if acc_left_controlled:
-            acc_current_speed = edge_speed_L
-        else:
-            acc_current_speed = edge_speed_R
+        acc_current_speed = acc_target_speed
         
         self.logger.debug(f'Decelerating at {round(self.acceleration, 2)}m/s^2')
         while acc_current_speed > 0:
+            acc_current_speed -= self.acceleration * self.acceleration_time_step
             if acc_left_controlled:
-                current_speed_L -= self.acceleration * self.acceleration_time_step
+                current_speed_L = acc_current_speed
                 current_speed_R = current_speed_L * speed_ratio
             else:
-                current_speed_R -= self.acceleration * self.acceleration_time_step
+                current_speed_R = acc_current_speed
                 current_speed_L = current_speed_R / speed_ratio
 
             step_rate_L = self.convert_speed_PWM_rate(current_speed_L, True)

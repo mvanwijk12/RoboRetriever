@@ -83,7 +83,7 @@ class Inference:
             if result.masks is not None:
                 masks = result.masks.data[result.boxes.data[:, -1] == self.LINES_CLS]
             else:
-                masks = torch.tensor([])
+                masks = np.array([])
             self.line_detections.masks = Masks(masks, result.orig_shape)
             
             # Retrieve the image

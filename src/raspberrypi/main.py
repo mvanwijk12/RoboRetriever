@@ -75,7 +75,12 @@ class RobotController:
                             self.search_pattern, self.drive_towards_box, self.turn_away_from_line, self.drive_towards_box, 
                             self.search_pattern, self.drive_towards_box, self.turn_away_from_line, self.drive_towards_box, self.deposition]
         
-        self.logger.info(f'Executing state function {STATE_FUNCTION_MAP_LIST[state]}...')
+        STATE_FUNCTION_MAP_LIST_NAME = ['search_pattern', 'navigate_around_box', 'turn_away_from_line', 'turn_away_from_line', 
+                            'drive_towards_ball', 'drive_towards_ball', 'turn_away_from_line', 'turn_away_from_line', 
+                            'search_pattern', 'drive_towards_box', 'turn_away_from_line', 'drive_towards_box', 
+                            'search_pattern', 'drive_towards_box', 'turn_away_from_line', 'drive_towards_box', 'self.deposition']
+        
+        self.logger.info(f'EXECUTING STATE FUNCTION {STATE_FUNCTION_MAP_LIST_NAME[state]}...\n')
         return STATE_FUNCTION_MAP_LIST[state]
 
 
@@ -183,8 +188,8 @@ class RobotController:
         lwheel, rwheel = self.controller.homing_multiplier(PIDout)
 
         # Take reciprocal of wheel velocity to avoid box
-        lwheel = np.where(lwheel == 0, 1, 1/lwheel)
-        rwheel = np.where(rwheel == 0, 1, 1/rwheel)
+        lwheel = float(np.where(lwheel == 0, 1, 1/lwheel))
+        rwheel = float(np.where(rwheel == 0, 1, 1/rwheel))
 
         # Save the multiplier for both wheels together, used for reversing
         self.stored_pathway.push([lwheel, rwheel])

@@ -70,7 +70,7 @@ class LineDetector:
             # RANSAC method to get y=mx+c
             # x_coords_np = x_coords.cpu().numpy()
             # y_coords_np = y_coords.cpu().numpy()
-            ransac = RANSACRegressor(residual_threshold=5, max_trials=5)
+            ransac = RANSACRegressor(max_trials=5)
             ransac.fit(x_coords.reshape(-1, 1), y_coords)
             a = ransac.estimator_.coef_[0]  # Slope
             c = ransac.estimator_.intercept_  # Intercept

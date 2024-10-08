@@ -208,6 +208,10 @@ class RobotController:
         self.robot.shake(count=3)
         time.sleep(2)
 
+        # Close deposition lid
+        self.robot.deposition_ctrl(open=False)
+        time.sleep(3)
+
         # Setup for next round of balls
         self.robot.n_collected_balls = 0
         self.robot.reached_box = False
@@ -274,7 +278,7 @@ class RobotController:
         return abs(y2 - y1) * abs(x2 - x1)
     
 
-    def determine_state(self, inf_results):
+    def determine_state(self, inf_results, prev_state):
         """ Determines the state of the FSM. Takes as input the inference results and interrupt flags
         for task timer and limit switches. Must be called frequently to avoid missing fleeting states. 
         
@@ -305,8 +309,9 @@ class RobotController:
         if bit4:
             self.logger.info(f'REACHED BOX, bit4 set high')
 
-        if not bit3: # if bit3 is 0, we don't care about bit4
+        if not bit3: # if bit3 is 0, we don't care about bit4 and should reset reached_box flag
             state = bit2 * 2**2 + bit1 * 2**1 + bit0 * 2**0
+            self.robot.reached_box = False
         else:
             # Turn off vacuum fan if stop condition is reached
             self.robot.fan_ctrl(on=False)
@@ -339,12 +344,14 @@ class RobotController:
 
     def main_loop(self):
         """ Entry point of program """
+        prev_state = 0
         while True:
             # Retrieve data from computer
             try:
                 x = self.con.get_message()
                 inf_results = self.parse_message(x)
-                state = self.determine_state(inf_results)
+                state = self.determine_state(inf_results, prev_state)
+                prev_state = state
                 fn_hdle = self.state_function_map(state)
                 fn_hdle(inf_results=inf_results)
             

@@ -198,7 +198,7 @@ class RobotController:
         self.robot.relative_drive(distance=self.distance_step, speed=self.speed, scaling_L=lwheel, scaling_R=rwheel) 
 
 
-    def deposition(self):
+    def deposition(self, **kwargs):
         """ Function to execute the ball deposition state. Used to release the balls into the 
          deposition box and setup the robot for the next round of ball collection. """
 
@@ -346,7 +346,7 @@ class RobotController:
                 inf_results = self.parse_message(x)
                 state = self.determine_state(inf_results)
                 fn_hdle = self.state_function_map(state)
-                #fn_hdle(inf_results=inf_results)
+                fn_hdle(inf_results=inf_results)
             
             except: # catch all exceptions including KeyboardInterrupt
                 # terminate gracefully

@@ -87,10 +87,12 @@ class Drive_B:
         """ Callback function for when a tennis ball is collected successfully """
         self.n_collected_balls += 1
         self.fan_ctrl(on=False) # Turn off vacuum fan
+        self.logger.info(f'Ball collected! Current ball count {self.n_collected_balls}')
 
     def box_proximity_callback(self, gpio, level, tick):
         """ Callback function for when limit switch hits the deposition box """
         self.reached_box = True 
+        self.logger.info('Box proximity limit switch triggered!')
 
     def all_stop(self):
         """ Sets wheel velocities to zero """

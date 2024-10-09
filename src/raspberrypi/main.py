@@ -38,11 +38,11 @@ class ItemsStack:
 
 class RobotController:
     MAX_BALLS = 5
-    MAX_TASK_TIME_S = 7 * 60
+    MAX_TASK_TIME_S = 8 * 60
     FAN_TURN_ON_THRES_DISTANCE = 2 # in metres
 
     def __init__(self):
-        self.stored_pathway = ItemsStack(maxlen=10) # store the last 10 movements
+        self.stored_pathway = ItemsStack(maxlen=5) # store the last 5 movements
         self.lwheel_sum = 0
         self.rwheel_sum = 0
         self.angle_line = None
@@ -132,8 +132,8 @@ class RobotController:
         PIDout = self.controller.PID(normalised_pixel_error)
         lwheel, rwheel = self.controller.homing_multiplier(PIDout)
         dist = self.estimate_distance(tennis_ball_bbox)
-        if dist <= self.FAN_TURN_ON_THRES_DISTANCE:
-            self.robot.fan_ctrl(on=True)
+        #if dist <= self.FAN_TURN_ON_THRES_DISTANCE:
+        self.robot.fan_ctrl(on=True)
 
         # Save the multiplier for both wheels together, used for reversing
         self.stored_pathway.push([lwheel, rwheel])
@@ -205,8 +205,8 @@ class RobotController:
         # Open deposition lid
         self.robot.deposition_ctrl(open=True)
         time.sleep(5) # wait 5s for balls to drop out
-        self.robot.shake(count=3)
-        time.sleep(2)
+        # self.robot.shake(count=3)
+        # time.sleep(2)
 
         # Close deposition lid
         self.robot.deposition_ctrl(open=False)
@@ -221,7 +221,7 @@ class RobotController:
             lwheel, rwheel = self.stored_pathway.pop()
             self.logger.info(f'backwards: left wheel {round(lwheel, 2)} right wheel {round(rwheel, 2)}')
             self.robot.relative_drive(distance=-self.distance_step, speed=self.speed, scaling_L=lwheel, scaling_R=rwheel) 
-
+        self.robot._turn_to_angle(180, 20, 0.1)
     
 
     def parse_message(self, msg):

@@ -14,7 +14,7 @@ __modified__ = "Matt van Wijk"
 __last_modified__ = "05/10/2024"
 
 class LineDetector:
-    def __init__(self, box_width_ratio=0.5, box_height_ratio=0.15, bottom_offset_ratio=0.03, masks_shape=(384, 640)):
+    def __init__(self, box_width_ratio=0.4, box_height_ratio=0.15, bottom_offset_ratio=0.03, masks_shape=(384, 640)):
         """ Initialises the LineDetector object
          
         Parameters:

@@ -9,7 +9,17 @@ Username: `e21` <br>
 Password: `e21`
 
 # Data Acquision
-To acquire images run the file `capture_imgs.sh` in the home directory. Note an internet connection is required to successfully upload to G-Drive (https://drive.google.com/drive/folders/1UyrnengsetC2KwwI0Q-vrXF5I9H4RCKW). 
+To acquire images run the file `capture_imgs.sh` in the home directory. The following options can be provided.
+
+## Options
+`-c <n_images> ` <br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; image count: number of images to capture (default 5 images) <br/>
+`-d <t_delay> ` <br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; image delay: the time to wait, in seconds, between images captures (default 3s) <br/>
+`-u `  <br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; upload: set this option to upload to G-Drive (requires internet connection - default does not upload)<br/>
+
+Note an internet connection is required to successfully upload to G-Drive (https://drive.google.com/drive/folders/1UyrnengsetC2KwwI0Q-vrXF5I9H4RCKW). 
 
 Without an internet connection the files will be stored locally on the RPi's SD Card.
 

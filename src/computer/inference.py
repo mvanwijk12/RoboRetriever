@@ -15,11 +15,21 @@ import cv2
 import time
 import logging
 from copy import deepcopy
+from camerastream import CameraStream
+from linedetection import LineDetector
+import torch
+from ultralytics.engine.results import Boxes, Masks
+import json
 
 
 class Inference:
-    def __init__(self, cs_stream, model_path='../../models/yolov8m.pt', frame_h=720, frame_w=1280):
-        """ Initialises the camera stream object """
+    BOX_CLS = 0
+    LINES_CLS = 1 
+    TENNIS_BALL_CLS = 2
+    CLASS_NAMES = ['box', 'line', 'tennis-ball']
+
+    def __init__(self, cs_stream, model_path='best.pt', frame_h=720, frame_w=1280):
+        """ Initialises the inference object """
         self.stopped = False
         self.has_new = False
         # self.stream = cs.CameraStream(src=src, frame_h=frame_h, frame_w=frame_w).start()
@@ -29,8 +39,7 @@ class Inference:
         self.condition = Condition()
         self.frame = None
         self.model = YOLO(model_path)
-        self.desired_class_ids = [key for key, value in self.model.names.items() if value == 'sports ball']
-        self.img_frame = None
+        # self.img_frame = None
         self.num_counter_above_threshold = 0 # counts the number of detections within distance_threshold
         self.start_time_above_threshold = 0 # records the start time of the first detection within distance_threshold
         self.num_counter_critial_value = 3 # robot stops once num_counter_above_threshold == num_counter_critial_value
@@ -38,12 +47,23 @@ class Inference:
         self.time_threshold = 120 # in seconds
         self.stop_condition = False
         self.logger = logging.getLogger(__name__)
+        self.ld = LineDetector()
 
     def start(self):
+        """ Starts the inference engine """
         Thread(target=self.process_image_update, args=()).start()
         return self
 
-    def process_image_update(self, conf=0.2):
+    def process_image_update(self, conf=0.4):
+        """ Function to be run in Thread to continually process image stream and execute inference. Sets self.tennis_ball_box_detections
+        and self.line_detections attributes.
+
+        Parameters:
+        - conf: inference confidence threshold. Inference results with confidence < conf, will be filtered out 
+        
+        Returns:
+         - Does not return, remains in infinite loop
+        """
         while True:
             if self.stopped: return
 
@@ -51,28 +71,23 @@ class Inference:
             self.frame = self.stream.read()
 
             # Run inference
-            result = self.model.track(source=self.frame, persist=True, conf=conf, verbose=False)[0]
-            self.class_names = result.names
-
-            # Convert to sv detection object
-            detections = sv.Detections.from_ultralytics(result)
-            if result.boxes.id is not None:
-                detections.tracker_id = result.boxes.id.cpu().numpy().astype(int) # TODO: replace with cuda instead of cpu()?
-
-            # Filter detections to only keep desired classes using mask
-            mask = np.isin(detections.class_id, self.desired_class_ids)
+            result = self.model.predict(source=self.frame, conf=conf, verbose=False)[0]
 
             # Apply the mask to filter the detections
-            self.filtered_detections = sv.Detections(
-                xyxy=detections.xyxy[mask],
-                confidence=detections.confidence[mask],
-                class_id=detections.class_id[mask],
-                tracker_id=detections.tracker_id[mask] if detections.tracker_id is not None else None,
-                data={key: value[mask] for key, value in detections.data.items()} if detections.data else None
-            )
+            self.tennis_ball_box_detections = result.new()
+            tennis_ball_box_mask = (result.boxes.data[:, -1] == self.BOX_CLS) | (result.boxes.data[:, -1] == self.TENNIS_BALL_CLS)
+            boxes = result.boxes.data[tennis_ball_box_mask]
+            self.tennis_ball_box_detections.boxes = Boxes(boxes, result.orig_shape)
+
+            self.line_detections = result.new()
+            if result.masks is not None:
+                masks = result.masks.data[result.boxes.data[:, -1] == self.LINES_CLS]
+            else:
+                masks = np.array([])
+            self.line_detections.masks = Masks(masks, result.orig_shape)
             
             # Retrieve the image
-            self.img_frame = result.orig_img
+            # self.img_frame = result.orig_img
             
             # We have a new frame
             with self.condition:
@@ -86,84 +101,97 @@ class Inference:
                 self.condition.wait()
 
         self.has_new = False 
-        return self.filtered_detections
+        return self.tennis_ball_box_detections, self.line_detections
     
     def read_plot(self):
+        """ Reads the inference results, evaluates the court line equations, plots the bboxes of boxes and tennis ball detection,
+          superimposes the line equations and the line trigger box and returns a formatted detection object to be sent to robot.
+
+        Returns:
+        - msg: a list of dictionaries containing the inference results from the tennis balls and boxes and the triggered line
+          direction in a dictionary (see self._wrap_detections)
+        """
         if not self.has_new:
             with self.condition:
                 self.condition.wait()
 
         # Copy the filtered detection for processing
         self.has_new = False
-        filtered_detects = deepcopy(self.filtered_detections)
-        image_frame = deepcopy(self.img_frame)
+        tennis_ball_box_detects = deepcopy(self.tennis_ball_box_detections)
+        line_detects = deepcopy(self.line_detections)
 
-        # Create Annotators
-        box_annotator = sv.BoxAnnotator() 
-        label_annotator = sv.LabelAnnotator()
-
-        n_detected_tennis_balls = len(filtered_detects.xyxy)
-        self.logger.info(f'Number of detected tennis ball: {n_detected_tennis_balls}')
+        ld_lines = None
+        if line_detects.masks is not None and len(line_detects.masks) > 0: 
+            ld_lines = self.ld.detect(line_detects.masks)
         
-        # Handle the case there are no detections and tracker_id is None
-        if filtered_detects.tracker_id is None:
-            tracker_id_array = np.array([])
+        self._plot_detections(tennis_ball_box_detects, ld_lines)
+        return self._wrap_detections(tennis_ball_box_detects, ld_lines)
+    
+    def _calculate_error_from_centre(self, bbox_xyxy):
+        """ Calculates the error of a bounding box from the vertical centreline of the image """
+        return 1/2*(bbox_xyxy[0] + bbox_xyxy[2]) - self.frame_w/2
+
+    def _plot_detections(self, tennis_ball_box_detects, ld_lines):
+        """ Plots the bboxes of boxes and tennis ball detection, superimposes the line equations and the line trigger box.
+        
+        Parameters:
+        - tennis_ball_box_detects: ultralytics.engine.results object containing inference results of the tennis balls and boxes
+        - ld_lines: (triggered, largest_line_index, all_lines, directions) tuple returned from linedetection.LineDector.detect
+
+        Returns:
+        - None
+        """
+        annotated_image = tennis_ball_box_detects.plot()
+        # annotated_image = cv2.resize(annotated_image, (self.ld.frame_width, self.ld.frame_height))
+        top_left = (int(self.ld.top_left[0] * 1280/640), int(self.ld.top_left[1] *720/384))
+        bottom_right = (int(self.ld.bottom_right[0] * 1280/640), int(self.ld.bottom_right[1] *720/384))
+        annotated_image = cv2.rectangle(annotated_image, top_left, bottom_right, (128, 0, 128), 2)
+        
+        if ld_lines is not None:
+            colours = [(0, 255, 0), (0, 165, 255), (0, 0, 255)] # BGR format
+            triggered, _, all_lines, _ = ld_lines
+            for i in range(len(all_lines)):
+                line = all_lines[i]
+                annotated_image = cv2.line(annotated_image, (int(line[0]*1280/1280), int(line[1]*720/720)), (int(line[2]*1280/1280), int(line[3]*720/720)), colours[triggered[i]], 2)
+                # annotated_image = cv2.line(annotated_image, (round(line[0] * 1280/640), round(line[1] * 720/384)), (round(line[2] * 1280/640), round(line[3] * 720/384)), colours[triggered[i]], 2)
+
+        cv2.imshow('annotated_img', annotated_image)
+        cv2.waitKey(5) 
+
+    def _wrap_detections(self, tennis_ball_box_detects, ld_lines):
+        """ Wraps the detection in a format to be sent to robot.
+         
+        Parameters:
+        - tennis_ball_box_detects: ultralytics.engine.results object containing inference results of the tennis balls and boxes
+        - ld_lines: (triggered, largest_line_index, all_lines, directions) tuple returned from linedetection.LineDector.detect
+
+        Returns:
+        - msg: a list of dictionaries containing the inference results from the tennis balls and boxes and the triggered line direction in a dictionary
+
+        Example msg object:
+        msg = [{'name': 'tennis ball', 'class': 2, 'confidence': 0.84805, 'box': {'x1': 0.68221, 'y1': 0.67851, 'x2': 0.70661, 'y2': 0.71689}},
+          {'name': 'box', 'class': 0, 'confidence': 0.61668, 'box': {'x1': 0.71994, 'y1': 0.52430, 'x2': 0.97645, 'y2': 0.65381}},
+            {'line_direction': None}]
+
+        msg = [{'name': 'tennis ball', 'class': 2, 'confidence': 0.90089, 'box': {'x1': 0.08580, 'y1': 0.74437, 'x2': 0.16918, 'y2': 0.87860}},
+          {'name': 'tennis ball', 'class': 2, 'confidence': 0.66197, 'box': {'x1': 0.064221, 'y1': 0.56082, 'x2': 0.08861, 'y2': 0.58090}},
+            {'line_direction': [-0.5857,  1.0000]}]
+        """
+        try:
+            msg = json.loads(tennis_ball_box_detects.tojson(normalize=True))
+        except TypeError:
+            return [] # this will cause the system to go into state 0, 8 or 16
+        
+        if ld_lines is not None: # if there is a line detected in the frame
+            _, largest_line_index, _, directions = ld_lines
+            if largest_line_index is not None: # if the line detected is in the trigger box
+                msg.append(dict(line_direction=directions[largest_line_index].tolist()))
+            else:
+                msg.append(dict(line_direction=None))
         else:
-            tracker_id_array = filtered_detects.tracker_id
+            msg.append(dict(line_direction=None))
 
-        labels = [
-                f"#{tracker_id} {self.class_names[class_id]} {confidence:0.2f} error: {1/2*(xyxy[0] + xyxy[2]) - self.frame_w/2:0.0f}"
-                for tracker_id, class_id, confidence, xyxy
-                in zip(tracker_id_array, filtered_detects.class_id, filtered_detects.confidence, filtered_detects.xyxy)
-            ]
-
-        # Plot the image with bounding boxes
-        if len(labels) == len(filtered_detects):
-            annotated_image = box_annotator.annotate(scene=image_frame, detections=filtered_detects)
-            annotated_image = label_annotator.annotate(scene=annotated_image, detections=filtered_detects, labels=labels)
-            cv2.imshow('annotated_img', annotated_image)
-            cv2.waitKey(5) 
-
-        # If a tennis ball is detected, calculate the error and dist estimate
-        if n_detected_tennis_balls > 0:
-
-            # Calculate the errors
-            x = 1/2*(filtered_detects.xyxy[:, 0] + filtered_detects.xyxy[:, 2]) - self.frame_w/2
-            
-            # Calculate the distances
-            dist = self.estimate_distance(filtered_detects.xyxy)
-
-            # Target the closest ball
-            dist_min_idx = np.argmin(dist)
-            
-            self.logger.info(f'Distance is {dist[dist_min_idx]}')
-
-            if dist[dist_min_idx] < self.distance_threshold:
-                self.logger.debug('Tennis ball detected within distance threshold')
-
-                # Check detections are close by in time
-                current_time = time.time()
-                if (current_time - self.start_time_above_threshold < self.time_threshold):
-                    self.num_counter_above_threshold += 1
-                    self.logger.debug(f'#Detection Counter Incremented {self.num_counter_above_threshold}')
-                else:
-                    self.start_time_above_threshold = current_time
-                    self.num_counter_above_threshold = 1
-                    self.logger.debug('#Detection Counter Reset')
-
-                # Check stop condition
-                if self.num_counter_above_threshold >= self.num_counter_critial_value:
-                    self.stop_condition = True
-                    
-        
-        if self.stop_condition:
-            msg = dict(error='0', stop='True')
-            self.logger.info(f'STOP CONDITION REACHED! TENNIS BALL DETECTED! msg = {msg}')
-            return msg
-        elif n_detected_tennis_balls > 0:
-            msg = dict(error=str(x[dist_min_idx]), stop='False')
-            self.logger.info(f'Tennis ball detected: msg = {msg}')
-            return msg
+        return msg
         
 
     def estimate_distance(self, bboxs, focal_pixel=770, real_world_diameter=67e-3):
@@ -188,6 +216,8 @@ class Inference:
 if __name__ == "__main__":
     logging.config.fileConfig('log.conf')
     logger = logging.getLogger(__name__)
-    cap = Inference().start()
+    cap = CameraStream(src='2024-09-28_16-01-10-validation-converted.mp4').start()
+    inf = Inference(cap).start()
     while True:
-        cap.logger.debug(cap.read_plot())
+        inf.logger.debug(inf.read_plot())
+        

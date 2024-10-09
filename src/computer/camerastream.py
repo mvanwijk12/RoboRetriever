@@ -15,20 +15,35 @@ import logging.config
 import time
 
 class CameraStream:
-    def __init__(self, src='tcp://robo-retriever.local:8554', frame_h=720, frame_w=1280):
+    def __init__(self, src='tcp://robo-retriever.local:8554', video_file_fps=None, max_con_attempts=5, frame_h=720, frame_w=1280):
         """ Initialises the camera stream object, set src=0 for testing with webcam """
+        assert video_file_fps != 0
         self.stopped = False
         self.has_new = []
+        self.video_file_fps = video_file_fps # used to add delay for reading video file to simulate video stream
         self.has_new_index = {}
         self.condition = Condition()
         self.lock = Lock()
         self.logger = logging.getLogger(__name__)
 
         # Setup cv2 VideoCapture
-        self.stream = cv2.VideoCapture(src)
+        stream_opened = False
+        attempts = 0
+        while not stream_opened and attempts < max_con_attempts:
+            attempts += 1
+            self.logger.info(f'Opening video stream - attempt {attempts}/{max_con_attempts}...')
+            self.stream = cv2.VideoCapture(src)
+            stream_opened = self.stream.isOpened()
+            time.sleep(1)
+
+        if attempts >= max_con_attempts:
+            self.logger.error(f'Failed to open video stream - max connection attempts reached')
+            raise Exception('Maximum Connection Attempts Reached - Failed to Resolve Hostname')
+        
+
         self.stream.set(cv2.CAP_PROP_BUFFERSIZE, 0) # No buffer so we grab the most recent frame
-        # self.stream.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_h)
-        # self.stream.set(cv2.CAP_PROP_FRAME_WIDTH, frame_w)
+        self.stream.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_h)
+        self.stream.set(cv2.CAP_PROP_FRAME_WIDTH, frame_w)
         (self.grabbed, self.frame) = self.stream.read()
         
     def start(self):
@@ -46,6 +61,9 @@ class CameraStream:
                 self.stream.release()
                 return 
             
+            if self.video_file_fps is not None:
+                time.sleep(1/self.video_file_fps)
+            
             (self.grabbed, self.frame) = self.stream.read()
             with self.condition:
                 self.update_frame_status()
@@ -54,7 +72,7 @@ class CameraStream:
     def read(self):
         """ Reads a frame from the stream """
         thread_name = current_thread().name
-        self.logger.debug(f'Reading a frame for thread {thread_name}')
+        #self.logger.debug(f'Reading a frame for thread {thread_name}')
 
         if not self.has_new_frame(thread_name):
             with self.condition:

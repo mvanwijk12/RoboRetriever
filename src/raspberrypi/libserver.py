@@ -28,7 +28,7 @@ class Message:
         try:
             # Should be ready to read
             data = self.sock.recv(4096)
-            self.logger.info(f'receieved {len(data)} bytes...')
+            # self.logger.info(f'receieved {len(data)} bytes...')
             #data = (1).to_bytes()
         except BlockingIOError:
             # Resource temporarily unavailable (errno EWOULDBLOCK)
@@ -115,7 +115,7 @@ class Message:
         if self.jsonheader["content-type"] == "text/json":
             encoding = self.jsonheader["content-encoding"]
             self.request = self._json_decode(data, encoding)
-            self.logger.info(f"Received request {self.request} from {self.addr}")
+            # self.logger.info(f"Received request {self.request} from {self.addr}")
             
             # Setup for next read
             self._jsonheader_len = None

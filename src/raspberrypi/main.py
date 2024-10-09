@@ -58,6 +58,9 @@ class RobotController:
         self.robot = Drive_B()
         self.controller = Controller(0.4, 0, 0) # value adjusted to deal with normalised error
         self.task_start_time = time.time()
+        self.search_pattern_bspeed = 0.5 # search pattern base speed
+        self.box_search_bspeed = 0.3 # box search base speed 
+        self.tennis_ball_search_bspeed = 0.5 # tennis ball base speed 
     
 
     def state_function_map(self, state):
@@ -78,7 +81,7 @@ class RobotController:
         STATE_FUNCTION_MAP_LIST_NAME = ['search_pattern', 'search_pattern', 'turn_away_from_line', 'turn_away_from_line', 
                             'drive_towards_ball', 'drive_towards_ball', 'turn_away_from_line', 'turn_away_from_line', 
                             'search_pattern', 'drive_towards_box', 'turn_away_from_line', 'drive_towards_box', 
-                            'search_pattern', 'drive_towards_box', 'turn_away_from_line', 'drive_towards_box', 'self.deposition']
+                            'search_pattern', 'drive_towards_box', 'turn_away_from_line', 'drive_towards_box', 'deposition']
         
         self.logger.info(f'EXECUTING STATE FUNCTION {STATE_FUNCTION_MAP_LIST_NAME[state]}...\n')
         return STATE_FUNCTION_MAP_LIST[state]
@@ -102,20 +105,21 @@ class RobotController:
 
         if self.counter > counter_thres:
             # turn right
-            lwheel = 0.1 # cannot be zero, for divide by zero reasons
-            rwheel = 1
+            lwheel = (1 + 0.2)*self.search_pattern_bspeed # cannot be zero, for divide by zero reasons
+            rwheel = (1 - 0.2)*self.search_pattern_bspeed
             self.counter = (self.counter + 1) % counter_wrap_around
         else:
             # drive straight
-            lwheel = 1
-            rwheel = 1
+            lwheel = self.search_pattern_bspeed
+            rwheel = self.search_pattern_bspeed
             self.counter = (self.counter + 1) % counter_wrap_around
 
         # Save the multiplier for both wheels together, used for reversing
         self.stored_pathway.push([lwheel, rwheel])
 
         self.logger.info(f'forwards: left wheel {round(lwheel, 2)} right wheel {round(rwheel, 2)}')
-        self.robot.relative_drive(distance=self.distance_step, speed=self.speed, scaling_L=lwheel, scaling_R=rwheel) 
+        self.robot.execute_drive(lwheel, rwheel)
+        # self.robot.relative_drive(distance=self.distance_step, speed=self.speed, scaling_L=lwheel, scaling_R=rwheel) 
 
 
     def drive_towards_ball(self, **kwargs):
@@ -130,8 +134,10 @@ class RobotController:
         self.logger.info("Ball detected, control initiated to traverse to ball ...")
         self.counter = 0
         PIDout = self.controller.PID(normalised_pixel_error)
-        lwheel, rwheel = self.controller.homing_multiplier(PIDout)
-        dist = self.estimate_distance(tennis_ball_bbox)
+        lwheel_mult, rwheel_mult = self.controller.homing_multiplier(PIDout)
+        lwheel = self.tennis_ball_search_bspeed * lwheel_mult
+        rwheel = self.tennis_ball_search_bspeed * rwheel_mult
+        # dist = self.estimate_distance(tennis_ball_bbox)
         #if dist <= self.FAN_TURN_ON_THRES_DISTANCE:
         self.robot.fan_ctrl(on=True)
 
@@ -139,13 +145,18 @@ class RobotController:
         self.stored_pathway.push([lwheel, rwheel])
 
         self.logger.info(f'forwards: left wheel {round(lwheel, 2)} right wheel {round(rwheel, 2)}')
-        self.robot.relative_drive(distance=self.distance_step, speed=self.speed, scaling_L=lwheel, scaling_R=rwheel) 
+        self.robot.execute_drive(lwheel, rwheel)
+        # self.robot.relative_drive(distance=self.distance_step, speed=self.speed, scaling_L=lwheel, scaling_R=rwheel) 
 
 
     def turn_away_from_line(self, **kwargs):
         """ Function to execute the turn away from line state. Used to navigate the robot away
          from the court quadrant boundaries. """
         if 'inf_results' in kwargs:
+            # Set speed to zero
+            self.robot.execute_drive(0, 0)
+
+            # Rebound off line
             direction = np.array(kwargs['inf_results'][2])
             self.robot.rebound_off_line(direction)
         else:
@@ -164,43 +175,48 @@ class RobotController:
         self.logger.info("Box detected, control initiated to traverse to box...")
         self.counter = 0
         PIDout = self.controller.PID(normalised_pixel_error)
-        lwheel, rwheel = self.controller.homing_multiplier(PIDout)
+        lwheel_mult, rwheel_mult = self.controller.homing_multiplier(PIDout)
+        lwheel = self.box_search_bspeed * lwheel_mult
+        rwheel = self.box_search_bspeed * rwheel_mult
 
         # Save the multiplier for both wheels together, used for reversing
         self.stored_pathway.push([lwheel, rwheel])
 
         self.logger.info(f'forwards: left wheel {round(lwheel, 2)} right wheel {round(rwheel, 2)}')
-        self.robot.relative_drive(distance=self.distance_step, speed=self.speed, scaling_L=lwheel, scaling_R=rwheel) 
+        self.robot.execute_drive(lwheel, rwheel)
+        # self.robot.relative_drive(distance=self.distance_step, speed=self.speed, scaling_L=lwheel, scaling_R=rwheel) 
 
 
-    def navigate_around_box(self, **kwargs):
-        """ Function to execute the drive around box state. Used to navigate the robot away from
-         the deposition box in the quadrant.  """
-        if 'inf_results' in kwargs:
-            box_bbox = kwargs['inf_results'][1]['box']
-        else:
-            raise Exception('Inference results not passed to self.drive_towards_box')
+    # def navigate_around_box(self, **kwargs):
+    #     """ Function to execute the drive around box state. Used to navigate the robot away from
+    #      the deposition box in the quadrant.  """
+    #     if 'inf_results' in kwargs:
+    #         box_bbox = kwargs['inf_results'][1]['box']
+    #     else:
+    #         raise Exception('Inference results not passed to self.drive_towards_box')
         
-        normalised_pixel_error = 1/2*(box_bbox['x1'] + box_bbox['x2']) - 1/2
-        self.logger.info("Box detected, control initiated to avoid box ...")
-        self.counter = 0
-        PIDout = self.controller.PID(normalised_pixel_error)
-        lwheel, rwheel = self.controller.homing_multiplier(PIDout)
+    #     normalised_pixel_error = 1/2*(box_bbox['x1'] + box_bbox['x2']) - 1/2
+    #     self.logger.info("Box detected, control initiated to avoid box ...")
+    #     self.counter = 0
+    #     PIDout = self.controller.PID(normalised_pixel_error)
+    #     lwheel, rwheel = self.controller.homing_multiplier(PIDout)
 
-        # Take reciprocal of wheel velocity to avoid box
-        lwheel = float(np.where(lwheel == 0, 1, 1/lwheel))
-        rwheel = float(np.where(rwheel == 0, 1, 1/rwheel))
+    #     # Take reciprocal of wheel velocity to avoid box
+    #     lwheel = float(np.where(lwheel == 0, 1, 1/lwheel))
+    #     rwheel = float(np.where(rwheel == 0, 1, 1/rwheel))
 
-        # Save the multiplier for both wheels together, used for reversing
-        self.stored_pathway.push([lwheel, rwheel])
+    #     # Save the multiplier for both wheels together, used for reversing
+    #     self.stored_pathway.push([lwheel, rwheel])
 
-        self.logger.info(f'forwards: left wheel {round(lwheel, 2)} right wheel {round(rwheel, 2)}')
-        self.robot.relative_drive(distance=self.distance_step, speed=self.speed, scaling_L=lwheel, scaling_R=rwheel) 
+    #     self.logger.info(f'forwards: left wheel {round(lwheel, 2)} right wheel {round(rwheel, 2)}')
+    #     self.robot.relative_drive(distance=self.distance_step, speed=self.speed, scaling_L=lwheel, scaling_R=rwheel) 
 
 
     def deposition(self, **kwargs):
         """ Function to execute the ball deposition state. Used to release the balls into the 
          deposition box and setup the robot for the next round of ball collection. """
+        # Set speed to zero
+        self.robot.execute_drive(0, 0)
 
         # Open deposition lid
         self.robot.deposition_ctrl(open=True)
@@ -220,7 +236,10 @@ class RobotController:
         while not self.stored_pathway.is_empty():
             lwheel, rwheel = self.stored_pathway.pop()
             self.logger.info(f'backwards: left wheel {round(lwheel, 2)} right wheel {round(rwheel, 2)}')
-            self.robot.relative_drive(distance=-self.distance_step, speed=self.speed, scaling_L=lwheel, scaling_R=rwheel) 
+            self.robot.execute_drive(-lwheel, -rwheel)
+            time.sleep(0.5) # approx delay from get_message()
+            # self.robot.relative_drive(distance=-self.distance_step, speed=self.speed, scaling_L=lwheel, scaling_R=rwheel) 
+        self.robot.execute_drive(0, 0)
         self.robot._turn_to_angle(180, 20, 0.1)
     
 

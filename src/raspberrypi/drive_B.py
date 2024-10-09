@@ -1,8 +1,8 @@
 """
-This is a revised python class to control driving, based on the Milestone 1 drive class
+This is a revised python class to control driving
 """
 __author__ = "Matt van Wijk, Alex Jones"
-__date__ = "12/09/2024"
+__date__ = "09/10/2024"
 
 # start the pigpiod daemon
 import os
@@ -43,6 +43,8 @@ class Drive_B:
         self.n_collected_balls = 0
         self.reached_box = False
         self.prev_time = time.time()
+        self.current_speed_L = 0
+        self.current_speed_R = 0
 
 
         # Set parameters for the robot

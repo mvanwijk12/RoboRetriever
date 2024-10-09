@@ -37,7 +37,7 @@ class ItemsStack:
 
 
 class RobotController:
-    MAX_BALLS = 5
+    MAX_BALLS = 3
     MAX_TASK_TIME_S = 8 * 60
     FAN_TURN_ON_THRES_DISTANCE = 2 # in metres
 
@@ -50,7 +50,7 @@ class RobotController:
         # self.lwheel = 0.0
         # self.rwheel = 0.0
         self.distance_step = 0.2 # in metres
-        self.speed = 0.1 # in m/s
+        self.speed = 0.2 # in m/s
         self.con = ConnectionServer().start()
         self.stop = 'False'
         self.logger = logging.getLogger(__name__)
@@ -78,7 +78,7 @@ class RobotController:
         STATE_FUNCTION_MAP_LIST_NAME = ['search_pattern', 'search_pattern', 'turn_away_from_line', 'turn_away_from_line', 
                             'drive_towards_ball', 'drive_towards_ball', 'turn_away_from_line', 'turn_away_from_line', 
                             'search_pattern', 'drive_towards_box', 'turn_away_from_line', 'drive_towards_box', 
-                            'search_pattern', 'drive_towards_box', 'turn_away_from_line', 'drive_towards_box', 'self.deposition']
+                            'search_pattern', 'drive_towards_box', 'turn_away_from_line', 'drive_towards_box', 'deposition']
         
         self.logger.info(f'EXECUTING STATE FUNCTION {STATE_FUNCTION_MAP_LIST_NAME[state]}...\n')
         return STATE_FUNCTION_MAP_LIST[state]

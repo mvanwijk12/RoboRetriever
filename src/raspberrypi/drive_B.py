@@ -183,7 +183,7 @@ class Drive_B:
         rev_rate_L = new_speed_L / (self.traction_factor * self.diameter_scaleL * self.wheel_diameter)
         rev_rate_R = new_speed_R / (self.traction_factor * self.diameter_scaleL * self.wheel_diameter)
         step_rate_L = rev_rate_L * self.steps_per_rev * (1/self.stepping_mode)
-        step_rate_R = rev_rate_L * self.steps_per_rev * (1/self.stepping_mode)
+        step_rate_R = rev_rate_R * self.steps_per_rev * (1/self.stepping_mode)
 
         # Hardware PWM
         self.pi.hardware_PWM(self.stepL, int(step_rate_L), 500000)
@@ -194,7 +194,7 @@ class Drive_B:
         # Negative wheel speeds are accepted and should be supplied for sharp turns
 
         # Speed limiting
-        assert self.speed_restrict != 0
+        assert self.speed_restrict > 0
 
         if max(abs(speed_L), abs(speed_R)) > self.speed_restrict:
             scale_by_linear_limit = self.speed_restrict / max(abs(speed_L), abs(speed_R))
@@ -208,7 +208,7 @@ class Drive_B:
         assert max_speed_difference != 0
 
         if abs(speed_L - speed_R) > max_speed_difference:
-            scale_by_turn_limit = abs(max_speed_difference / abs(speed_L - speed_R))
+            scale_by_turn_limit = abs(max_speed_difference) / abs(speed_L - speed_R)
         else:
             scale_by_turn_limit = 1
         
@@ -229,8 +229,9 @@ class Drive_B:
         error_L = speed_L - self.current_speed_L
         error_R = speed_R - self.current_speed_R
         accel_time = max(abs(error_L), abs(error_R)) / self.acceleration_rate
-        accel_L = error_L / accel_time
-        accel_R = error_R / accel_time
+        if accel_time != 0:
+            accel_L = error_L / accel_time
+            accel_R = error_R / accel_time
 
         self.logger.debug(f'Accelerating to speeds: left: {speed_L}, right: {speed_R} in {accel_time} s')
         # Acceleration loop
@@ -338,15 +339,12 @@ class Drive_B:
         # The acceleration function calculates off the left wheel speed, so we can use the right wheel to avoid the acceleration time
         movement_time = 0.1
         right_wheel_speed = 0.1
-        for count in range(count):
-            self.execute_drive(0.01, right_wheel_speed)
+        for _ in range(count):
+            self.execute_drive(0, right_wheel_speed)
+            time.sleep(movement_time)
+            self.execute_drive(0, -1 * right_wheel_speed)
             time.sleep(movement_time)
             self.execute_drive(0, 0)
-            time.sleep(0.1)
-            self.execute_drive(-0.01, right_wheel_speed)
-            time.sleep(movement_time)
-            self.execute_drive(0, 0)
-            time.sleep(0.1)
 
 
 if __name__ == "__main__":
@@ -368,22 +366,20 @@ if __name__ == "__main__":
             req_mode = int(input("Enter driving mode: "))
 
             if req_mode == 0:
-                distance = float(input("Enter distance, will be converted to positive"))
-                print('Speeds and multipliers will give forward movement of wheel if product is positive, backwards if negative')
+                time_at_speed = float(input("Enter time at constant speed, will be converted to positive: "))
                 speed = float(input("Enter base speed in m/s: "))
                 multiplier_L = float(input("Enter left wheel multiplier: "))
                 multiplier_R = float(input("Enter right wheel multiplier: "))
                 print("Caution: Robot about to move")
                 time.sleep(1)
 
-                # Stop robot then move with zero speed at finish point
-                robot.execute_drive(0, 0)
                 distance = abs(distance)
-                # Scale multipliers and base speed so that the higher multiplier is 1
-                
-                # Estimate acceleration distance
-                # s=u*t+(1/2)*a*t^2 with u=0
-                accel_dist = 1/2 * robot.acceleration_rate
+                # Scale multipliers and base speed so that the higher multiplier has absolute value 1
+                speed_L = speed * multiplier_L
+                speed_R = speed * multiplier_R
+                robot.execute_drive(speed_L, speed_R)
+                time.sleep(time_at_speed)
+                robot.execute_drive(0, 0)
             
             elif req_mode == 1:
                 print("Currently unable to drive backwards in this mode")

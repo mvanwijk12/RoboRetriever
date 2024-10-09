@@ -41,7 +41,8 @@ class Drive_B:
         self.act_retract = act_retract
         self.act_extend = act_extend
         self.n_collected_balls = 0
-        self.reached_box = False 
+        self.reached_box = False
+        self.prev_time = time.time()
 
 
         # Set parameters for the robot
@@ -57,7 +58,7 @@ class Drive_B:
         self.spacing_scale = 1.034 # scaling factor for wheel spacing
 
         # Speed and acceleration parameters
-        self.speed_restrict = 0.2 # speed restriction due to motor behaviour in week 7 lab
+        self.speed_restrict = 0.3 
         self.turn_rate_retrict = 45 # Turn rate limit in deg/s
         self.acceleration = 0.05 # value in ms^-2
         self.acceleration_time_step = 0.02 # number of seconds between speed updates
@@ -80,19 +81,22 @@ class Drive_B:
         self.pi.set_pull_up_down(self.depoProx, pigpio.PUD_UP)
 
         # Set up interrupt for rising edges on the tach pin
-        self.pi.callback(self.sucAcq, pigpio.RISING_EDGE, self.successful_acquision_callback)
-        self.pi.callback(self.depoProx, pigpio.RISING_EDGE, self.box_proximity_callback)
+        self.pi.callback(self.sucAcq, pigpio.FALLING_EDGE, self.successful_acquision_callback)
+        self.pi.callback(self.depoProx, pigpio.FALLING_EDGE, self.box_proximity_callback)
 
     def successful_acquision_callback(self, gpio, level, tick):
         """ Callback function for when a tennis ball is collected successfully """
-        self.n_collected_balls += 1
-        self.fan_ctrl(on=False) # Turn off vacuum fan
-        self.logger.info(f'Ball collected! Current ball count {self.n_collected_balls}')
+        cur_time = time.time()
+        if cur_time - self.prev_time > 1:
+            self.n_collected_balls += 1
+            self.prev_time = cur_time
+            # self.fan_ctrl(on=False) # Turn off vacuum fan
+            self.logger.info(f'BALL COLLECTED! CURRENT BALL COUNT {self.n_collected_balls}')
 
     def box_proximity_callback(self, gpio, level, tick):
         """ Callback function for when limit switch hits the deposition box """
         self.reached_box = True 
-        self.logger.info('Box proximity limit switch triggered!')
+        self.logger.info('BOX PROXIMITY LIMIT SWITCH TRIGGERED!')
 
     def all_stop(self):
         """ Sets wheel velocities to zero """

@@ -38,11 +38,11 @@ class ItemsStack:
 
 class RobotController:
     MAX_BALLS = 5
-    MAX_TASK_TIME_S = 7 * 60
+    MAX_TASK_TIME_S = 8 * 60
     FAN_TURN_ON_THRES_DISTANCE = 2 # in metres
 
     def __init__(self):
-        self.stored_pathway = ItemsStack(maxlen=10) # store the last 10 movements
+        self.stored_pathway = ItemsStack(maxlen=5) # store the last 5 movements
         self.lwheel_sum = 0
         self.rwheel_sum = 0
         self.angle_line = None
@@ -132,8 +132,8 @@ class RobotController:
         PIDout = self.controller.PID(normalised_pixel_error)
         lwheel, rwheel = self.controller.homing_multiplier(PIDout)
         dist = self.estimate_distance(tennis_ball_bbox)
-        if dist <= self.FAN_TURN_ON_THRES_DISTANCE:
-            self.robot.fan_ctrl(on=True)
+        #if dist <= self.FAN_TURN_ON_THRES_DISTANCE:
+        self.robot.fan_ctrl(on=True)
 
         # Save the multiplier for both wheels together, used for reversing
         self.stored_pathway.push([lwheel, rwheel])
@@ -205,8 +205,12 @@ class RobotController:
         # Open deposition lid
         self.robot.deposition_ctrl(open=True)
         time.sleep(5) # wait 5s for balls to drop out
-        self.robot.shake(count=3)
-        time.sleep(2)
+        # self.robot.shake(count=3)
+        # time.sleep(2)
+
+        # Close deposition lid
+        self.robot.deposition_ctrl(open=False)
+        time.sleep(3)
 
         # Setup for next round of balls
         self.robot.n_collected_balls = 0
@@ -217,7 +221,7 @@ class RobotController:
             lwheel, rwheel = self.stored_pathway.pop()
             self.logger.info(f'backwards: left wheel {round(lwheel, 2)} right wheel {round(rwheel, 2)}')
             self.robot.relative_drive(distance=-self.distance_step, speed=self.speed, scaling_L=lwheel, scaling_R=rwheel) 
-
+        self.robot._turn_to_angle(180, 20, 0.1)
     
 
     def parse_message(self, msg):
@@ -274,7 +278,7 @@ class RobotController:
         return abs(y2 - y1) * abs(x2 - x1)
     
 
-    def determine_state(self, inf_results):
+    def determine_state(self, inf_results, prev_state):
         """ Determines the state of the FSM. Takes as input the inference results and interrupt flags
         for task timer and limit switches. Must be called frequently to avoid missing fleeting states. 
         
@@ -305,8 +309,9 @@ class RobotController:
         if bit4:
             self.logger.info(f'REACHED BOX, bit4 set high')
 
-        if not bit3: # if bit3 is 0, we don't care about bit4
+        if not bit3: # if bit3 is 0, we don't care about bit4 and should reset reached_box flag
             state = bit2 * 2**2 + bit1 * 2**1 + bit0 * 2**0
+            self.robot.reached_box = False
         else:
             # Turn off vacuum fan if stop condition is reached
             self.robot.fan_ctrl(on=False)
@@ -339,12 +344,14 @@ class RobotController:
 
     def main_loop(self):
         """ Entry point of program """
+        prev_state = 0
         while True:
             # Retrieve data from computer
             try:
                 x = self.con.get_message()
                 inf_results = self.parse_message(x)
-                state = self.determine_state(inf_results)
+                state = self.determine_state(inf_results, prev_state)
+                prev_state = state
                 fn_hdle = self.state_function_map(state)
                 fn_hdle(inf_results=inf_results)
             

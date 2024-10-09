@@ -444,7 +444,7 @@ class Drive_B:
         # The acceleration function calculates off the left wheel speed, so we can use the right wheel to avoid the acceleration time
         movement_time = 0.1
         right_wheel_speed = 0.15
-        for count in range(count):
+        for _ in range(count):
             self.execute_drive(movement_time, 0.01, right_wheel_speed)
             time.sleep(0.1)
             self.execute_drive(movement_time, -0.01, -right_wheel_speed)

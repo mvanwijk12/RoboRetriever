@@ -48,6 +48,7 @@ class Inference:
         self.stop_condition = False
         self.logger = logging.getLogger(__name__)
         self.ld = LineDetector()
+        self.stop = False
 
     def start(self):
         """ Starts the inference engine """
@@ -69,6 +70,8 @@ class Inference:
 
             # Capture frame
             self.frame = self.stream.read()
+            if self.frame is None:
+                self.stop = True
 
             # Run inference
             result = self.model.predict(source=self.frame, conf=conf, verbose=False)[0]
@@ -154,7 +157,7 @@ class Inference:
                 line = all_lines[i]
                 annotated_image = cv2.line(annotated_image, (int(line[0]*1280/1280), int(line[1]*720/720)), (int(line[2]*1280/1280), int(line[3]*720/720)), colours[triggered[i]], 2)
                 # annotated_image = cv2.line(annotated_image, (round(line[0] * 1280/640), round(line[1] * 720/384)), (round(line[2] * 1280/640), round(line[3] * 720/384)), colours[triggered[i]], 2)
-
+        out.write(annotated_image)
         cv2.imshow('annotated_img', annotated_image)
         cv2.waitKey(5) 
 
@@ -216,8 +219,11 @@ class Inference:
 if __name__ == "__main__":
     logging.config.fileConfig('log.conf')
     logger = logging.getLogger(__name__)
-    cap = CameraStream(src='2024-09-28_16-01-10-validation-converted.mp4').start()
-    inf = Inference(cap).start()
-    while True:
+    cap = CameraStream(src='2024-09-28_16-01-10-validation-converted.mp4', video_file_fps=30).start()
+    inf = Inference(cap, model_path='best_tennis_court_s2.pt').start()
+    # Define the codec and create VideoWriter object to write the video (use 'mp4v' codec for MP4 format)
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter('cv_demo_video.mp4', fourcc, 30, (1280, 720))
+    while not inf.stop:
         inf.logger.debug(inf.read_plot())
-        
+    out.release()

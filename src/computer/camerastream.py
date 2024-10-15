@@ -65,6 +65,8 @@ class CameraStream:
                 time.sleep(1/self.video_file_fps)
             
             (self.grabbed, self.frame) = self.stream.read()
+            if not self.grabbed:
+                self.stopped = True 
             with self.condition:
                 self.update_frame_status()
                 self.condition.notify_all()    
@@ -82,8 +84,10 @@ class CameraStream:
         with self.lock:
             frame = deepcopy(self.frame) # Create a copy 
             self.has_new[self.has_new_index[str(thread_name)]] = False  # Ensure has_new is reset by only one thread
-        
-        return frame
+        if not self.stopped:
+            return frame
+        else:
+            return None
 
     def has_new_frame(self, thread_name):
         """ Checks if there is a new frame ready for the current thread """

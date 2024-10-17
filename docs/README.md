@@ -1,6 +1,6 @@
 # Raspberry Pi Setup
 ## Install OS
-To setup the Raspberry Pi we must first flash the operating system onto the SD card. Our chosen operating system is Raspberry Pi OS Lite Bookwork 64-bit. Download the Raspberry Pi imager from  the website below and follow the instructions to install Raspberry Pi OS Lite Bookwork 64-bit
+To setup the Raspberry Pi 4B we must first flash the operating system onto the SD card. Our chosen operating system is Raspberry Pi OS Lite Bookwork 64-bit. Download the Raspberry Pi imager from  the website below and follow the instructions to install Raspberry Pi OS Lite Bookwork 64-bit
 https://www.raspberrypi.com/software/ 
 
 ## Install Git

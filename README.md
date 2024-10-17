@@ -11,5 +11,5 @@ Monash University ECE4191 capstone design project to create an autonomous tennis
 ```
 
 <div style="text-align: center;">
-    <img src="img/img01.jpg" alt="RoboRetriever"/>
+    <img src="img/VacuumBot.png" alt="RoboRetriever"/>
 </div>
